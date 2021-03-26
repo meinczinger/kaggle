@@ -14,6 +14,7 @@ class MCTSAgent:
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
         self._config = configuration
+        self._mcts = None
 
     def act(self, observation):
         deadline = time.time() + self._config.timeout - 0.1
@@ -23,7 +24,11 @@ class MCTSAgent:
         # it seems sometimes the mark is incorrect so
         own_player = observation.mark
 
-        action = MonteCarloTreeSearch.search(self._config, board, own_player, deadline)
+        # Starting a new game
+        if observation.step <= 1:
+            self._mcts = MonteCarloTreeSearch(self._config, board, own_player)
+
+        action = self._mcts.search(board, own_player, deadline, True)
 
         return int(action)
 

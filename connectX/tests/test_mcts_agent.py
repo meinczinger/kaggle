@@ -16,6 +16,7 @@ class TestMCTSAgent(unittest.TestCase):
                      2, 0,
                      0, 1, 0, 2, 1, 2, 0]
         obs.mark = 1
+        obs.step = 0
         mcts = MCTSAgent(self.config)
         action = mcts.act(obs)
         self.assertEqual(3, action)
@@ -29,6 +30,7 @@ class TestMCTSAgent(unittest.TestCase):
                      0, 1, 2, 1, 2, 2, 2,
                      2, 1, 2, 2, 1, 1, 1]
         obs.mark = 2
+        obs.step = 1
         mcts = MCTSAgent(self.config)
         action = mcts.act(obs)
         self.assertEqual(1, action)
@@ -42,6 +44,7 @@ class TestMCTSAgent(unittest.TestCase):
                      0, 2, 1, 2, 1, 0, 0,
                      1, 2, 1, 1, 2, 0, 0]
         obs.mark = 1
+        obs.step = 0
         mcts = MCTSAgent(self.config)
         action = mcts.act(obs)
         self.assertNotEqual(1, action)
@@ -55,6 +58,7 @@ class TestMCTSAgent(unittest.TestCase):
                      2, 0, 0, 2, 1, 0, 0,
                      2, 2, 1, 2, 1, 0, 0]
         obs.mark = 2
+        obs.step = 1
         mcts = MCTSAgent(self.config)
         action = mcts.act(obs)
         self.assertEqual(4, action)

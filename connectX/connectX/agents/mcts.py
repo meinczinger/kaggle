@@ -23,6 +23,8 @@ class GameTree:
         self._last_used_node_id = -1
         # Exploration factor for UCB
         self._explore_factor = 2.0
+        # Create dictionaty to look up node by board
+        self._node_lookup = defaultdict()
         # Create the root node
         self._current = \
             self.add_node(False, 0,
@@ -35,7 +37,17 @@ class GameTree:
         self._tree[self._last_used_node_id] = \
             {'action': action, 'nr_of_visits': 0, 'value': 0,
              'leaf': leaf, 'parent': None, 'children': [], 'bitboard': board.hash(), 'player': player}
+        # Add the new node to the lookup table
+        self._node_lookup[self.bitboard(self._last_used_node_id)] = self._last_used_node_id
         return self._last_used_node_id
+
+    def node_from_board(self, board, player):
+        bitboard = \
+            BitBoard.create_from_board(self._config.columns, self._config.rows, self._config.inarow, player, board)
+        try:
+            return self._node_lookup[bitboard.hash()]
+        except:
+            return -1
 
     """ The node contains the bitboards, create a BitBoard class from these """
     def board(self, node):
@@ -146,20 +158,35 @@ class MonteCarloTreeSearch:
         """
         self._logger = Logger.logger('GameTreeControl')
         self._config = configuration
+        self._initialize(board, own_player)
+        self._simulator = Simulator(configuration)
+
+    def search(self, board: list, own_player: int, deadline: float, reuse: bool=False) -> int:
+        """ performs monte carlo tree search
+        :param board: the board acting as the root of the search
+        :param own_player: with which layer we are playing with
+        :param deadline: by when the search need to finish
+        :param reuse: whether the search tree should be reused within one episode.
+        :return best action found
+        """
+        if reuse:
+            current_node = self._tree.node_from_board(board, own_player)
+            if current_node == -1:
+                self._initialize(board, own_player)
+            else:
+                self._tree.set_current(current_node)
+        else:
+            self._initialize(board, own_player)
+        # Keep extending the tree until we have time
+        while time.time() < deadline:
+            self.extend_tree(100)
+        return self.get_best_action()
+
+    def _initialize(self, board, own_player):
         self._tree = GameTree(self._config, board, own_player)
         self._step_count = 0
         self._epoch_step_count = 0
-        self._simulator = Simulator(configuration)
         self._own_player = own_player
-
-    @staticmethod
-    def search(config, board, own_player, deadline):
-        tree = MonteCarloTreeSearch(config, board, own_player)
-        tree._own_player = own_player
-        # Kepp extending the tree until we have time
-        while time.time() < deadline:
-            tree.extend_tree(100)
-        return tree.get_best_action()
 
     def get_best_action(self):
         return self._tree.get_best_action(self._own_player)

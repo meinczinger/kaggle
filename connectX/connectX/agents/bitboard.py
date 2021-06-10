@@ -79,7 +79,7 @@ class BitBoard:
     """ Create an empty board """
     @classmethod
     def create_empty_board(cls, width, height, mark_in_row, player):
-        return cls(width, height, mark_in_row, player, [0] * (width * height))
+        return cls(width, height, mark_in_row, player, np.array([0, 0], dtype=np.int64))
 
     """ Copy a BitBoard instance """
     def __copy__(self):
@@ -103,6 +103,88 @@ class BitBoard:
                     bitboard_player |= (1 << n)    # mark as player 2 square, else assume p1=0 as default
         bitboard = np.array([bitboard_played, bitboard_player], dtype=np.int64)
         return bitboard
+
+    """ Convert bitboard back to list-based board """
+    def to_list(self):
+        board = []
+        for n in range(self._width * self._height):
+            is_played = (self._bitboard[0] >> n) & 1
+            if is_played:
+                player = (self._bitboard[1] >> n) & 1
+                board.append(int(player + 1))
+            else:
+                board.append(int(0))
+        return board
+
+    """ Convert bitboard back to list-based board """
+    @staticmethod
+    def bitboard_to_list(columns, rows, bitboard):
+        board = []
+        for n in range(columns * rows):
+            is_played = (bitboard[0] >> n) & 1
+            if is_played:
+                player = (bitboard[1] >> n) & 1
+                board.append(int(player + 1))
+            else:
+                board.append(int(0))
+        return board
+
+    def bitboard_to_numpy(self) -> np.ndarray:
+        global configuration
+        rows = self._height
+        columns = self._width
+        size = rows * columns
+        output = np.zeros((size,), dtype=np.int8)
+        for i in range(size):  # prange
+            is_played = (self._bitboard[0] >> i) & 1
+            if is_played:
+                player = (self._bitboard[1] >> i) & 1
+                output[i] = 1 if player == 0 else 2
+        return output.reshape((rows, columns))
+
+    @staticmethod
+    def bitboard_to_numpy2d(bitboard, columns=7, rows=6) -> np.ndarray:
+        global configuration
+        size = rows * columns
+        output = np.zeros((size,), dtype=np.int8)
+        for i in range(size):  # prange
+            is_played = (bitboard[0] >> i) & 1
+            if is_played:
+                player = (bitboard[1] >> i) & 1
+                output[i] = 1 if player == 0 else 2
+        return output.reshape((rows, columns))
+
+    @staticmethod
+    def board_channels(numpy_data):
+        channels = np.zeros((1, 6, 7, 2))
+        channels[:, :, :, 0] = np.where(numpy_data == 1, 1, 0)
+        channels[:, :, :, 1] = np.where(numpy_data == 2, 1, 0)
+        return channels
+
+    """ Convert bitboard back to list-based board """
+    @staticmethod
+    def from_bitboard_to_list(width, height, bitboard):
+        board = []
+        for n in range(width * height):
+            is_played = (bitboard[0] >> n) & 1
+            if is_played:
+                player = (bitboard[1] >> n) & 1
+                board.append(int(player + 1))
+            else:
+                board.append(int(0))
+        return board
+
+    """ Convert bitboard back to list-based board """
+    def to_str(self):
+        board = ""
+        for n in range(self._width * self._height):
+            is_played = (self._bitboard[0] >> n) & 1
+            if is_played:
+                player = (self._bitboard[1] >> n) & 1
+                board += str(player + 1)
+            else:
+                board += '0'
+        return board
 
     """ Check if the state is a draw """
     def is_draw(self) -> bool:
@@ -139,9 +221,8 @@ class BitBoard:
             self._bitboard[1] |= new_mark_mask
         # If we reached an end-state:
         self._end_state = self._is_end_state()
-        # If we are in an end state, check if we have a draw
-        if self._end_state:
-            self._draw = self.is_draw()
+        # Check if there is a draw
+        self._draw = self.is_draw()
 
         self._top_marks[column] = self._player + 1
 
@@ -163,8 +244,8 @@ class BitBoard:
         return (1 - self._player) + 1
 
     """ Returns whether the board is a terminal state """
-    def is_terminal_state(self):
-        return self._end_state or self.is_draw()
+    def is_terminal_state(self) -> bool:
+        return self._end_state or self._draw
 
     """ What are the top-marks - for a trivial heuristic """
     def top_marks(self):
@@ -208,3 +289,17 @@ class BitBoard:
     """ Swap the marks on the board """
     def swap_marks_board(self):
         return self._bitboard[0], ~ self._bitboard[1]
+
+    def mirror_board(self):
+        # Get mirrored board
+        board = self.bitboard_to_numpy()
+        board = np.flip(board, 1)
+        return list(board.reshape(self._width * self._height,))
+
+    def channels(self):
+        np_boards = np.array(self.bitboard_to_numpy())
+        np_boards = np_boards.reshape((1, 6, 7))
+        np_boards_channels = np.zeros((1, 6, 7, 2))
+        np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
+        np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
+        return np_boards_channels

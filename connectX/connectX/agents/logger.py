@@ -31,3 +31,7 @@ class Logger:
     @classmethod
     def logger(cls, component, target='error.log', level=logging.WARNING):
         return cls(component, target, level)
+
+    @classmethod
+    def info_logger(cls, component, target='error.log', level=logging.INFO):
+        return cls(component, target, level)

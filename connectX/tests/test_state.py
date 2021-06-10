@@ -1,5 +1,5 @@
 import unittest
-from state import State, Orientation
+from state import State, SimpleState, Orientation
 
 
 class TestState(unittest.TestCase):
@@ -73,23 +73,80 @@ class TestState(unittest.TestCase):
         self.assertEqual("1000", s.diagonal(5, 1, Orientation.LEFT), "Incorrect diagonal")
         self.assertEqual("0100", s.diagonal(4, 0, Orientation.RIGHT), "Incorrect diagonal")
 
-    def active_player(self):
+    def test_active_player(self):
         s = State(6, 4, [1, 2], 3, 1)
         self.assertEqual(1, s.active_player(), "Active player should be 1")
-        s.make_action(2, 1)
-        s.make_action(0, 2)
-        self.assertEqual(1, s.active_player(), "Active player should be 1")
-        s.make_action(0, 1)
-        self.assertEqual(2, s.active_player(), "Active player should be 2")
+        # s.make_action(2, 1)
+        # s.make_action(0, 2)
+        # self.assertEqual(1, s.active_player(), "Active player should be 1")
+        # s.make_action(0, 1)
+        # self.assertEqual(2, s.active_player(), "Active player should be 2")
 
-    def state_from_board(self):
+    def test_state_from_board(self):
         state = State(6, 4, [1, 2], 3, 1)
-        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1, 0, 0, 1]
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0,
+                 0, 1, 2, 0, 0, 1, 0, 0, 1]
         s = State.state_from_board(board, state)
         self.assertListEqual(['22', '', '', '', '', '11'], s.columns(), "Columns incorrect after first move")
 
+    def test_simple_state_from_board(self):
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0,
+                 0, 1, 2, 0, 0, 1, 0, 0, 1]
+        state = SimpleState(7, 6, [1, 2], 4, board, 1)
+        self.assertListEqual([2, 0, 0, 0, 0, 0, 1], state.row(1), "Columns incorrect after first move")
 
+    def test_board_state_board(self):
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0,
+                 0, 1, 2, 0, 0, 1, 0, 0, 1]
+        state = SimpleState(7, 6, [1, 2], 4, board, 1)
+        board2 = state.board_from_matrix()
+        self.assertListEqual(board, board2)
 
+    def test_top_marks(self):
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        state = SimpleState(7, 6, [1, 2], 4, board, 1)
+        self.assertEqual(0, state.top_marks()[1], "zero 1s at the beginning")
+        self.assertEqual(0, state.top_marks()[2], "zero 2s at the beginning")
+        state.make_action(3, 1)
+        self.assertEqual(1, state.top_marks()[1], 'one 1s at the beginning')
+        self.assertEqual(0, state.top_marks()[2], 'zero 2s still')
+        state.make_action(2, 1)
+        self.assertEqual(2, state.top_marks()[1])
+
+    def test_end_state(self):
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        state = SimpleState(7, 6, [1, 2], 4, board, 1)
+        self.assertEqual(False, state.is_terminal_state())
+        state.make_action(4, 1)
+        state.make_action(4, 1)
+        state.make_action(4, 1)
+        #state.make_action(4, 1)
+        self.assertEqual(False, state.is_terminal_state())
+        state.make_action(0, 2)
+        state.make_action(1, 2)
+        state.make_action(2, 2)
+        state.make_action(3, 2)
+        self.assertEqual(True, state.is_terminal_state())
+
+    def test_diagonal_in_end_state(self):
+        board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        state = SimpleState(7, 6, [1, 2], 4, board, 1)
+        state.make_action(0, 1)
+        state.make_action(1, 2)
+        state.make_action(1, 1)
+        state.make_action(2, 2)
+        state.make_action(2, 1)
+        state.make_action(2, 1)
+        state.make_action(3, 2)
+        state.make_action(3, 1)
+        state.make_action(3, 2)
+        state.make_action(3, 1)
+        for i in range(3, -1, -1):
+            print(state.row(i))
+        self.assertEqual(True, state.is_terminal_state())
 
 if __name__ == '__main__':
     unittest.main()

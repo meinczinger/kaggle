@@ -1,4 +1,4 @@
-from mcts import MonteCarloTreeSearch
+from classic_mcts import ClassicMonteCarloTreeSearch
 import logging
 import time
 
@@ -14,10 +14,11 @@ class MCTSAgent:
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
         self._config = configuration
-        self._mcts = None
+        self._mcts = ClassicMonteCarloTreeSearch(self._config)
 
-    def act(self, observation):
-        deadline = time.time() + self._config.timeout - 0.1
+    def act(self, observation, explore=False):
+        deadline = time.time() + self._config.actTimeout - 0.05
+
         """ Main method to act on opponents move """
         board = observation.board
 
@@ -26,9 +27,9 @@ class MCTSAgent:
 
         # Starting a new game
         if observation.step <= 1:
-            self._mcts = MonteCarloTreeSearch(self._config, board, own_player)
+            self._mcts.initialize(board, own_player)
 
-        action = self._mcts.search(board, own_player, deadline, True)
+        action = self._mcts.search(board, own_player, deadline, True, explore)
 
         return int(action)
 

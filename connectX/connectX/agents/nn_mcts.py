@@ -156,8 +156,8 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
     #                 self.update(child, value)
 
     def rollout(self, node):
-        # The value of the node was computed during explore so here just return the value
-        # return self._tree.value(node)
+        if self._tree.leaf(node):
+            return self._leaf_value(node)
 
         # Set prior based on predicted value
         parent = self._tree.parent(node)

@@ -182,7 +182,7 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         # Get the predicted state value
         np_board = [BitBoard.from_bitboard_to_list(
             self._config.columns, self._config.rows, self._tree.bitboard(node))]
-        pred = self._state_value_model[self._tree.player(node) - 1].predict(np_board)[0][0]
+        pred = self._state_value_model[(self._tree.player(node) % 2)].predict(np_board)[0][0]
         return pred * 2 - 1.0
 
 

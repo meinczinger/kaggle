@@ -257,7 +257,7 @@ def evaluate(iter):
 
     logger.info("The final reward ratio is " + str(ratio_1) + ", " + str(ratio_2))
 
-    limit = 1.05
+    limit = 1.07
     if ratio_1 >= limit:
         logger.info("Making last candidate agent for player 1 to become the best agent")
         os.system('rm -r resources/models/best_state_value_model_p1/')

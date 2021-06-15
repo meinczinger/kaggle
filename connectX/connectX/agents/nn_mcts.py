@@ -89,6 +89,18 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
             self._config.columns, self._config.rows, self._tree.bitboard(node))]
         return np.around(self._priors_model[player-1].predict(np_board)[0], decimals=4)
 
+    def expand(self, node):
+        expanded_node = super().expand(node)
+
+        # Get the predicted priors for each state
+        priors = self._get_priors_probabilities(node, self._tree.player(node))
+        # Store the values in the child nodes
+        children = self._tree.children(node)
+        for child in children:
+            self._tree.set_prior(child, priors[self._tree.action(child)])
+
+        return expanded_node
+
     # def expand(self, node):
     #     expanded = super().expand(node)
     #
@@ -159,13 +171,13 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         if self._tree.leaf(node):
             return self._leaf_value(node)
 
-        # Set prior based on predicted value
-        parent = self._tree.parent(node)
-        if parent is not None:
-            np_board = [BitBoard.from_bitboard_to_list(
-                self._config.columns, self._config.rows, self._tree.bitboard(parent))]
-            prior_pred = self._priors_model[self._tree.player(node)-1].predict(np_board)[0]
-            self._tree.set_prior(node, prior_pred[self._tree.action(node)])
+        # # Set prior based on predicted value
+        # parent = self._tree.parent(node)
+        # if parent is not None:
+        #     np_board = [BitBoard.from_bitboard_to_list(
+        #         self._config.columns, self._config.rows, self._tree.bitboard(parent))]
+        #     prior_pred = self._priors_model[self._tree.player(node)-1].predict(np_board)[0]
+        #     self._tree.set_prior(node, prior_pred[self._tree.action(node)])
 
         # Get the predicted state value
         np_board = [BitBoard.from_bitboard_to_list(

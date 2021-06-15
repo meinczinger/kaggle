@@ -54,8 +54,8 @@ obs.mark = 1
 #cProfile.run('agent.act(obs)')
 
 
-sim = Simulator(config, NeuralNetworkAgent(config, False, True, True, 0),
-                NeuralNetworkAgent(config, False, True, True, 0))
+sim = Simulator(config, NeuralNetworkAgent(config, False, False, False, 0),
+                NeuralNetworkAgent(config, False, False, False, 0))
 
 sim.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
 

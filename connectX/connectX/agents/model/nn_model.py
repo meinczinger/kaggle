@@ -6,9 +6,11 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.initializers import glorot_uniform
 import numpy as np
 from bitboard import BitBoard
-from tensorflow import function, make_ndarray
+from tensorflow import function
+from pathlib import Path
 
 
+MODEL_FOLDER = Path("resources/models/")
 MAX_EPOCHS = 20
 
 
@@ -76,13 +78,15 @@ class NNModel:
         return predictions
 
     def save(self):
-        self._model.save('resources/models/' + self._name)
+        self._model.save(MODEL_FOLDER / self._name)
 
     def load(self, name=None):
         if name is None:
-            self._model = load_model('resources/models/' + self._name)
+            model_file = MODEL_FOLDER / self._name
         else:
-            self._model = load_model('resources/models/' + name)
+            model_file = MODEL_FOLDER / name
+
+        self._model = load_model(model_file)
 
     def history(self):
         return self._history

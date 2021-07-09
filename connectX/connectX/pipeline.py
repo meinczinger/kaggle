@@ -2,19 +2,16 @@ from simulator import Simulator
 from nn_agent import NeuralNetworkAgent
 from kaggle_environments.utils import Struct
 import numpy as np
-from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Input, Conv2D, MaxPooling2D, Flatten, BatchNormalization, Dropout
-from tensorflow.keras import initializers
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.optimizers import SGD
 from bitboard import BitBoard
 import os
 from logger import Logger
 from baseline import BaselineAgent
 import pandas as pd
 from nn_model import StateValueNNModel, PriorsNNModel
+from pathlib import Path
 
 
+GAMES_FOLDER = Path("resources/games/")
 config = Struct()
 config.columns = 7
 config.rows = 6
@@ -28,7 +25,7 @@ BUFFER_SIZE = 50000
 SAMPLE_SIZE = 20000
 EXPLORATION_PHASE_SELF_PLAY = 12
 EXPLORATION_PHASE_EVALUATION = 4
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-4
 
 
 def train_state_value_model(train, player):
@@ -36,8 +33,8 @@ def train_state_value_model(train, player):
     if train:
         # state_values = np.genfromtxt('resources/games/train_state_value' + '_p' + str(player) + '.csv',
         #                              delimiter=',', dtype=np.int64)
-
-        state_values = pd.read_csv('resources/games/train_state_value' + '_p' + str(player) + '.csv',
+        games_file = 'train_state_value' + '_p' + str(player) + '.csv'
+        state_values = pd.read_csv(GAMES_FOLDER / games_file,
                                    delimiter=',', header=None)
         # state_values = state_values[state_values.iloc[:, -1] != 0]
         state_values = state_values[-BUFFER_SIZE:]
@@ -112,7 +109,8 @@ def train_state_value_model(train, player):
 def train_priors_model(train, player):
     train_x_channels = train_y = None
     if train:
-        priors = pd.read_csv('resources/games/train_priors' + '_p' + str(player) + '.csv',
+        games_file = 'train_priors' + '_p' + str(player) + '.csv'
+        priors = pd.read_csv(GAMES_FOLDER / games_file,
                              delimiter=',', header=None)
 
         # priors = np.genfromtxt('resources/games/train_priors' + '_p' + str(player) + '.csv', delimiter=',')
@@ -260,17 +258,20 @@ def evaluate(iter):
     limit = 1.07
     if ratio_1 >= limit:
         logger.info("Making last candidate agent for player 1 to become the best agent")
-        os.system('rm -r resources/models/best_state_value_model_p1/')
-        os.system('cp -R resources/models/candidate_state_value_model_p1 resources/models/best_state_value_model_p1')
-        os.system('rm -r resources/models/best_priors_model_p1/')
-        os.system('cp -R resources/models/candidate_priors_model_p1 resources/models/best_priors_model_p1')
+        os.system('rmdir /s /q  resources\models\\best_state_value_model_p1')
+        os.system(
+            'xcopy /e /y resources\models\candidate_state_value_model_p1 resources\models\\best_state_value_model_p1\\')
+        os.system('rmdir /s /q resources\models\\best_priors_model_p1')
+        os.system(
+            'xcopy /e /y resources\models\candidate_priors_model_p1 resources\models\\best_priors_model_p1\\')
     if ratio_2 >= limit:
         logger.info("Making last candidate agent for player 2 to become the best agent")
-        os.system('rm -r resources/models/best_state_value_model_p2/')
+        os.system('rmdir /s /q resources\models\\best_state_value_model_p2')
         os.system(
-            'cp -R resources/models/candidate_state_value_model_p2 resources/models/best_state_value_model_p2')
-        os.system('rm -r resources/models/best_priors_model_p2/')
-        os.system('cp -R resources/models/candidate_priors_model_p2 resources/models/best_priors_model_p2')
+            'xcopy /e /y resources\models\candidate_state_value_model_p2 resources\models\\best_state_value_model_p2\\')
+        os.system('rmdir /s /q  resources\models\\best_priors_model_p2')
+        os.system(
+            'xcopy /e /y resources\models\candidate_priors_model_p2 resources\models\\best_priors_model_p2\\')
 
     if (ratio_1 >= limit) or (ratio_2 >= limit):
         evaluate_against_baseline(iter)

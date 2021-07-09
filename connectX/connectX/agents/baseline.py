@@ -18,7 +18,7 @@ class BaselineAgent:
         self._mcts = None
 
     def act(self, observation):
-        deadline = time.time() + self._config.timeout - 1.8 + (np.random.rand() - 0.5)/10.0
+        deadline = time.time() + self._config.timeout - 1.5 + (np.random.rand() - 0.5)/10.0
         """ Main method to act on opponents move """
         board = observation.board
 

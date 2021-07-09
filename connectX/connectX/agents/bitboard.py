@@ -56,8 +56,8 @@ class BitBoard:
         self._bitboard = bit_board
         # Payer: 1->0, 2->1
         self._player = (player + 1) % 2
-        self._mask_board = (1 << self._width * self._height) - 1
-        self._mask_legal_moves = (1 << self._width) - 1
+        self._mask_board = (np.int64(1) << self._width * self._height) - 1
+        self._mask_legal_moves = (np.int64(1) << self._width) - 1
         self._end_state = False
         self._draw = False
         self._game_overs = GameOvers.get_instance(self._width, self._height, self._mark_in_row)
@@ -92,8 +92,8 @@ class BitBoard:
     def list_to_bitboard(board: Union[np.ndarray, List[int]]) -> np.ndarray:
         # bitboard[0] = played, is a square filled             | 0 = empty, 1 = filled
         # bitboard[1] = player, who's token is this, if filled | 0 = empty, 1 = filled
-        bitboard_played = 0  # 42 bit number for if board square has been played
-        bitboard_player = 0  # 42 bit number for player 0=p1 1=p2
+        bitboard_played = np.int64(0)  # 42 bit number for if board square has been played
+        bitboard_player = np.int64(0)  # 42 bit number for player 0=p1 1=p2
         if isinstance(board, np.ndarray):
             board = board.flatten()
         for n in range(len(board)):  # prange
@@ -200,7 +200,7 @@ class BitBoard:
     """ Find the first empty row so that the new piece can be placed there """
     def _first_empty_row_for_column(self, column):
         for i in range(self._height - 1, -1, -1):
-            mask_column = (1 << column) << (i * self._width)
+            mask_column = (np.int64(1) << column) << (i * self._width)
             if not (self._bitboard[0] & mask_column):
                 return i
 
@@ -215,7 +215,7 @@ class BitBoard:
     def make_action(self, column):
         # find the lowest mark, which is not yet marked in the given column
         row = self._first_empty_row_for_column(column)
-        new_mark_mask = 1 << (row * self._width + column)
+        new_mark_mask = np.int64(1) << (row * self._width + column)
         self._bitboard[0] |= new_mark_mask
         if self._player:
             self._bitboard[1] |= new_mark_mask
@@ -257,7 +257,7 @@ class BitBoard:
     """ Set the top marks after a move """
     def _set_top_marks(self):
         for n in range(self._width * self._height -1, -1, -1):
-            mask = 1 << n
+            mask = np.int64(1) << n
             if self._bitboard[0] & mask:
                 if self._bitboard[1] & mask:
                     player = 2
@@ -280,7 +280,7 @@ class BitBoard:
         for c in range(self._width):
             masks.append(1 << c)
             for i in range(1, self._width):
-                masks[c] = (1 << (self._width * i + c)) | masks[c]
+                masks[c] = (np.int64(1) << (self._width * i + c)) | masks[c]
         for c in masks:
             if (action_bit & c) > 0:
                 self._last_action = masks.index(c)

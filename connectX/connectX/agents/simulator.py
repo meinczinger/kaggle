@@ -4,6 +4,11 @@ from bitboard import BitBoard
 from logger import Logger
 import copy
 import pandas as pd
+from pathlib import Path
+
+
+MODEL_FOLDER = Path("resources/models/")
+GAMES_FOLDER = Path("resources/games/")
 
 
 class Simulator:
@@ -55,8 +60,10 @@ class Simulator:
         priors_df = pd.DataFrame([[priors[k]['player']] + [priors[k]['step']] + priors[k]['board'] +
                                   priors[k]['priors'] for k in priors])
         priors_df.iloc[:, 1] = steps - 1 - priors_df.iloc[:, 1]
-        priors_df[priors_df[0] == 1].iloc[:, 1:].to_csv('resources/games/train_priors_p1.csv', index=False, header=False, mode='a')
-        priors_df[priors_df[0] == 2].iloc[:, 1:].to_csv('resources/games/train_priors_p2.csv', index=False, header=False, mode='a')
+        priors_df[priors_df[0] == 1].iloc[:, 1:].\
+            to_csv(GAMES_FOLDER / 'train_priors_p1.csv', index=False, header=False, mode='a')
+        priors_df[priors_df[0] == 2].iloc[:, 1:].\
+            to_csv(GAMES_FOLDER / 'train_priors_p2.csv', index=False, header=False, mode='a')
 
         # Set reward from the first player's point of view
         if bitboard.is_draw():
@@ -75,7 +82,8 @@ class Simulator:
             # Reverse the step_nr to make it the distance from the end state
             h2.iloc[:, 0] = steps - 1 - h2.iloc[:, 0]
             h2['value'] = reward if ply == 0 else -reward
-            h2.to_csv('resources/games/train_state_value_p' + str(ply+1) + '.csv', index=False, header=False, mode='a')
+            games_file = 'train_state_value_p' + str(ply+1) + '.csv'
+            h2.to_csv(GAMES_FOLDER / games_file, index=False, header=False, mode='a')
 
     def simulate(self, board: BitBoard, to_play: int) -> int:
         """

@@ -8,13 +8,14 @@ class NeuralNetworkAgent:
     _agent = None
 
     def __init__(self, configuration, self_play=False, use_best_player1=True, use_best_player2=True,
-                 exploration_phase=0):
+                 exploration_phase=0, time_reduction=0.1):
         self.logger = logging.getLogger('nn agent')
         self._config = configuration
         self._mcts = None
         self._self_play = self_play
         self._mcts = NeuralNetworkMonteCarloTreeSearch(
             self._config, self_play, use_best_player1, use_best_player2, exploration_phase)
+        self._time_reduction = time_reduction
 
     def act(self, observation):
         """ Main method to act on opponents move """
@@ -29,7 +30,7 @@ class NeuralNetworkAgent:
         else:
             limit = 2
 
-        deadline = time.time() + self._config.actTimeout - 1.5
+        deadline = time.time() + self._config.actTimeout - self._time_reduction
 
         if observation.step < limit:
             self._mcts.initialize(board, own_player)

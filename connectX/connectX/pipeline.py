@@ -168,7 +168,7 @@ def train_priors_model(train, player):
     priors_conv_model = PriorsNNModel('candidate_priors_model_p' + str(player))
 
     try:
-        priors_conv_model.load()
+        priors_conv_model.load(None, LEARNING_RATE)
     except:
         priors_conv_model.create_model(5e-4)
 
@@ -183,7 +183,8 @@ def train_priors_model(train, player):
 
 
 def self_play(iter):
-    sim = Simulator(config, NeuralNetworkAgent(config, True, True, True, EXPLORATION_PHASE_SELF_PLAY))
+    time_reduction = 1.0
+    sim = Simulator(config, NeuralNetworkAgent(config, True, True, True, EXPLORATION_PHASE_SELF_PLAY, time_reduction))
     logger.info("Starting self play")
     for i in range(iter):
         print("Self play,", i, 'th iteration')
@@ -200,12 +201,13 @@ def optimize(train=True):
 
 def evaluate(iter):
     logger.info("Starting evaluation")
-    best1_best2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION),
-                            NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION))
-    candidate1_best2 = Simulator(config, NeuralNetworkAgent(config, False, False, True, EXPLORATION_PHASE_EVALUATION),
-                                 NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION))
-    best1_candidate2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION),
-                                 NeuralNetworkAgent(config, False, True, False, EXPLORATION_PHASE_EVALUATION))
+    time_reduction = 1.0
+    best1_best2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                            NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    candidate1_best2 = Simulator(config, NeuralNetworkAgent(config, False, False, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                                 NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    best1_candidate2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                                 NeuralNetworkAgent(config, False, True, False, EXPLORATION_PHASE_EVALUATION, time_reduction))
 
     ratio_1 = ratio_2 = 0
     count = 0
@@ -255,7 +257,7 @@ def evaluate(iter):
 
     logger.info("The final reward ratio is " + str(ratio_1) + ", " + str(ratio_2))
 
-    limit = 1.07
+    limit = 1.15
     if ratio_1 >= limit:
         logger.info("Making last candidate agent for player 1 to become the best agent")
         os.system('rmdir /s /q  resources\models\\best_state_value_model_p1')
@@ -279,9 +281,10 @@ def evaluate(iter):
 
 def evaluate_against_baseline(iter):
     logger.info("Starting evaluation against baseline")
+    time_reduction = 1.5
     sim_B1_C2 = Simulator(config, BaselineAgent(config),
-                          NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION))
-    sim_C1_B2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION),
+                          NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    sim_C1_B2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
                           BaselineAgent(config))
     ratio_1 = ratio_2 = 0
     count = 0

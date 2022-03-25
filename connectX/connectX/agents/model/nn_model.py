@@ -8,17 +8,21 @@ import numpy as np
 from bitboard import BitBoard
 from tensorflow import function
 from pathlib import Path
+import logging
 
-
+# MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
 MODEL_FOLDER = Path("resources/models/")
 MAX_EPOCHS = 20
 
 
 class NNModel:
     def __init__(self, name):
-        self._name = name
+        self._name = name + '.h5'
         self._model = None
         self._history = None
+        self._logger = logging.getLogger('agent')
+        self._logger.setLevel(logging.DEBUG)
+        self._logger.addHandler(logging.StreamHandler())
 
     def create_model(self):
         raise NotImplementedError
@@ -78,15 +82,15 @@ class NNModel:
         return predictions
 
     def save(self):
-        self._model.save(MODEL_FOLDER / self._name)
+        self._model.save(MODEL_FOLDER / self._name, save_format='h5')
 
-    def load(self, name=None):
+    def load(self, name=None, lr=5e-5):
         if name is None:
             model_file = MODEL_FOLDER / self._name
         else:
             model_file = MODEL_FOLDER / name
 
-        self._model = load_model(model_file)
+        self._model = load_model(model_file, custom_objects={'learning_rate': lr})
 
     def history(self):
         return self._history
@@ -98,7 +102,7 @@ class StateValueNNModel(NNModel):
 
     def create_model(self, lr=1e-3):
         self._model = Sequential([
-            Conv2D(128, 4, padding='same', input_shape=(6, 7, 2)),
+            Conv2D(256, 4, padding='same', input_shape=(6, 7, 2)),
             BatchNormalization(axis=3),
             Activation('relu'),
             MaxPooling2D(),
@@ -124,12 +128,6 @@ class StateValueNNModel(NNModel):
         ])
 
         self._model.compile(loss='binary_crossentropy', optimizer=Adam(learning_rate=lr), metrics=['mean_squared_error'])
-
-    def load(self, name=None, lr=5e-5):
-        if name is None:
-            self._model = load_model('resources/models/' + self._name, custom_objects={'learning_rate': lr})
-        else:
-            self._model = load_model('resources/models/' + name, custom_objects={'learning_rate': lr})
 
 
 class PriorsNNModel(NNModel):

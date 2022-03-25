@@ -5,7 +5,7 @@ import os
 sys.path.append("/kaggle_simulations/agent")
 sys.path.append("/kaggle_simulations/agent/agents")
 sys.path.append("/kaggle_simulations/agent/agents/model")
-sys.path.append("/opt/conda/lib/python3.7/site-packages/kaggle_environments")
+# sys.path.append("/opt/conda/lib/python3.7/site-packages/kaggle_environments")
 if os.environ.get('GFOOTBALL_DATA_DIR', ''):
     os.chdir('/kaggle_simulations/agent/')
 

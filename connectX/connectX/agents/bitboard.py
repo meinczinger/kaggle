@@ -140,7 +140,8 @@ class BitBoard:
             if is_played:
                 player = (self._bitboard[1] >> i) & 1
                 output[i] = 1 if player == 0 else 2
-        return output.reshape((rows, columns))
+        # return output.reshape((rows, columns))
+        return output
 
     @staticmethod
     def bitboard_to_numpy2d(bitboard, columns=7, rows=6) -> np.ndarray:
@@ -205,7 +206,7 @@ class BitBoard:
                 return i
 
     """" Check if the board is an end state """
-    def _is_end_state(self):
+    def is_end_state(self):
         return np.any((self._bitboard[0] & self._bitboard[1]) & self._game_overs[:] == self._game_overs[:]) or \
                np.any((self._bitboard[0] & ~self._bitboard[1]) & self._game_overs[:] == self._game_overs[:])
         # return any([g for g in self._game_overs if (self._bitboard[0] & self._bitboard[1]) & g == g or
@@ -220,7 +221,7 @@ class BitBoard:
         if self._player:
             self._bitboard[1] |= new_mark_mask
         # If we reached an end-state:
-        self._end_state = self._is_end_state()
+        self._end_state = self.is_end_state()
         # Check if there is a draw
         self._draw = self.is_draw()
 

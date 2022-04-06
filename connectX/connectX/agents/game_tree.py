@@ -28,8 +28,10 @@ class GameTree:
     def add_node(self, leaf, action, board, player):
         self._last_used_node_id += 1
         self._tree[self._last_used_node_id] = \
-            {'action': action, 'nr_of_visits': 0, 'value': 0,
-             'leaf': leaf, 'parent': None, 'children': [], 'bitboard': board.hash(), 'player': player, 'prior': 0}
+            {'action': action, 'nr_of_visits': 0, 'value_set': False, 'value': 0,
+             'leaf': leaf, 'parent': None, 'children': [], 'bitboard': board.hash(),
+             'board_list': board.bitboard_to_numpy(), 'board': board,
+             'player': player, 'prior_set': False, 'prior': 0}
         # Add the new node to the lookup table
         self._node_lookup[self.bitboard(self._last_used_node_id)] = self._last_used_node_id
         return self._last_used_node_id
@@ -44,12 +46,16 @@ class GameTree:
 
     """ The node contains the bitboards, create a BitBoard class from these """
     def board(self, node):
-        return BitBoard.create_from_bitboard(self._config.columns, self._config.rows, self._config.inarow,
-                                             self.player(node), [self.bitboard(node)[0], self.bitboard(node)[1]])
+        # return BitBoard.create_from_bitboard(self._config.columns, self._config.rows, self._config.inarow,
+        #                                      self.player(node), [self.bitboard(node)[0], self.bitboard(node)[1]])
+        return self._tree[node]['board']
 
     """ Returns the bitboards for a node """
     def bitboard(self, node):
         return self._tree[node]['bitboard']
+
+    def board_list(self, node):
+        return self._tree[node]['board_list']
 
     """ Returns the current node """
     def current(self):

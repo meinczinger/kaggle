@@ -26,6 +26,9 @@ SAMPLE_SIZE = 20000
 EXPLORATION_PHASE_SELF_PLAY = 12
 EXPLORATION_PHASE_EVALUATION = 4
 LEARNING_RATE = 1e-4
+TIME_REDUCTION = 1.5
+TIME_REDUCTION_EVALUATION = 1.7
+Z_STAT_SIGNIFICANT = 1.5
 
 
 def train_state_value_model(train, player):
@@ -183,8 +186,9 @@ def train_priors_model(train, player):
 
 
 def self_play(iter):
-    time_reduction = 1.0
-    sim = Simulator(config, NeuralNetworkAgent(config, True, True, True, EXPLORATION_PHASE_SELF_PLAY, time_reduction))
+    time_reduction = TIME_REDUCTION
+    sim = Simulator(config, NeuralNetworkAgent(config, True, False, True, True,
+                                               EXPLORATION_PHASE_SELF_PLAY, time_reduction))
     logger.info("Starting self play")
     for i in range(iter):
         print("Self play,", i, 'th iteration')
@@ -199,83 +203,108 @@ def optimize(train=True):
     train_priors_model(train, 2)
 
 
-def evaluate(iter):
+def zstat(x, y, sample_size):
+    pstd = ((sample_size - 1) * np.std(x)**2 + (sample_size - 1) * np.std(y)**2) / (2 * sample_size - 2)
+    tstat = (np.average(x) - np.average(y)) / (np.sqrt(pstd * 2 / sample_size))
+    # zstat = (np.average(x) - np.average(y)) / np.sqrt(np.std(x)**2/sample_size + np.std(y)**2/sample_size)
+    # print('tstat/zstat', tstat, zstat)
+    return tstat
+
+
+def evaluate(iterations):
     logger.info("Starting evaluation")
-    time_reduction = 1.0
-    best1_best2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
-                            NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
-    candidate1_best2 = Simulator(config, NeuralNetworkAgent(config, False, False, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
-                                 NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
-    best1_candidate2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
-                                 NeuralNetworkAgent(config, False, True, False, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    time_reduction = TIME_REDUCTION_EVALUATION
+    best1_best2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                            NeuralNetworkAgent(config, False, True, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    candidate1_best2 = Simulator(config, NeuralNetworkAgent(config, False, True, False, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                                 NeuralNetworkAgent(config, False, True, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
+    best1_candidate2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+                                 NeuralNetworkAgent(config, False, True, True, False, EXPLORATION_PHASE_EVALUATION, time_reduction))
 
-    ratio_1 = ratio_2 = 0
-    count = 0
+    round_length = 10
 
-    reward_best1_best2 = 0
-    reward_best2_best1 = 0
-    reward_candidate1_best2 = 0
-    reward_candidate2_best1 = 0
+    best1_best2_buffer = []
+    best2_best1_buffer = []
+    candidate1_best2_buffer = []
+    candidate2_best1_buffer = []
+    zstat1, zstat2 = 0, 0
 
-    for i in range(2*iter):
-        # Best vs best
-        winner = best1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
-        if winner == 1:
-            reward_best1_best2 += 1.0
-        else:
-            if winner == 0:
-                reward_best1_best2 += 0.5
-                reward_best2_best1 += 0.5
+    for i in range(int(2*iterations / round_length)):
+        reward_best1_best2 = 0
+        reward_best2_best1 = 0
+        reward_candidate1_best2 = 0
+        reward_candidate2_best1 = 0
+
+        for j in range(round_length):
+            # print('Round', i, 'game', j)
+            # Best vs best
+            winner = best1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
+            if winner == 1:
+                reward_best1_best2 += 1.0
             else:
-                reward_best2_best1 += 1.0
-        # Candidate vs best
-        winner = candidate1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
-        if winner == 1:
-            reward_candidate1_best2 += 1.0
-        else:
-            if winner == 0:
-                reward_candidate1_best2 += 0.5
+                if winner == 0:
+                    reward_best1_best2 += 0.5
+                    reward_best2_best1 += 0.5
+                else:
+                    reward_best2_best1 += 1.0
+            # Candidate vs best
+            winner = candidate1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
+            if winner == 1:
+                reward_candidate1_best2 += 1.0
+            else:
+                if winner == 0:
+                    reward_candidate1_best2 += 0.5
 
-        # Best vs candidate
-        winner = best1_candidate2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
-        if winner == 2:
-            reward_candidate2_best1 += 1.0
-        else:
-            if winner == 0:
-                reward_candidate2_best1 += 0.5
+            # Best vs candidate
+            winner = best1_candidate2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
+            if winner == 2:
+                reward_candidate2_best1 += 1.0
+            else:
+                if winner == 0:
+                    reward_candidate2_best1 += 0.5
 
-        count += 1
+        best1_best2_buffer.append(reward_best1_best2 / float(round_length))
+        best2_best1_buffer.append(reward_best2_best1 / float(round_length))
+        candidate1_best2_buffer.append(reward_candidate1_best2 / float(round_length))
+        candidate2_best1_buffer.append(reward_candidate2_best1 / float(round_length))
 
-        ratio_1 = reward_candidate1_best2 / reward_best1_best2 if reward_best1_best2 > 0 else 100
-        ratio_2 = reward_candidate2_best1 / reward_best2_best1 if reward_best2_best1 > 0 else 100
-        # ratio_1 = (reward_candidate1_best2 - reward_best1_best2) / count
-        # ratio_2 = (reward_candidate2_best1 - reward_best2_best1) / count
+        print("Candidate1 vs best2 averages after round", i, candidate1_best2_buffer)
+        print("Best1 vs best2 averages after round", i, best1_best2_buffer)
+        print("Candidate2 vs best1 averages after round", i, candidate2_best1_buffer)
+        print("Best2 vs best1 averages after round", i, best2_best1_buffer)
 
-        print("Candidate1-Best2:", reward_candidate1_best2, "/", count, "Best1-Best2:", reward_best1_best2, "/", count)
-        print("Candidate2-Best1:", reward_candidate2_best1, "/", count, "Best2-Best1:", reward_best2_best1, "/", count, )
-        print("Evaluate, after iteration", i, ", the reward ratio is", ratio_1, ratio_2)
+        zstat1 = zstat(candidate1_best2_buffer, best1_best2_buffer, round_length)
+        zstat2 = zstat(candidate2_best1_buffer, best2_best1_buffer, round_length)
+        print('zstats after round', i, 'candidate1/best1 against best2', round(zstat1, 2),
+              'candidate2/best2 against best1', round(zstat2, 2))
 
-    logger.info("The final reward ratio is " + str(ratio_1) + ", " + str(ratio_2))
-
-    limit = 1.15
-    if ratio_1 >= limit:
+    logger.info('zstats - candidate1 vs best1: ' + str(round(zstat1, 2)) + ', candidate2 vs best2: '
+                + str(round(zstat2, 2)))
+    if zstat1 >= Z_STAT_SIGNIFICANT:
         logger.info("Making last candidate agent for player 1 to become the best agent")
-        os.system('rmdir /s /q  resources\models\\best_state_value_model_p1')
         os.system(
-            'xcopy /e /y resources\models\candidate_state_value_model_p1 resources\models\\best_state_value_model_p1\\')
-        os.system('rmdir /s /q resources\models\\best_priors_model_p1')
+            'cp resources\models\candidate_state_value_model_p1.h5 resources\models\\best_state_value_model_p1.h5')
         os.system(
-            'xcopy /e /y resources\models\candidate_priors_model_p1 resources\models\\best_priors_model_p1\\')
-    if ratio_2 >= limit:
+            'cp resources\models\candidate_priors_model_p1.h5 resources\models\\best_priors_model_p1.h5')
+        # os.system(
+        #     'xcopy /e /y resources\models\candidate_state_value_model_p1 resources\models\\best_state_value_model_p1\\')
+        # os.system('rmdir /s /q resources\models\\best_priors_model_p1')
+        # os.system(
+        #     'xcopy /e /y resources\models\candidate_priors_model_p1 resources\models\\best_priors_model_p1\\')
+    if zstat2 >= Z_STAT_SIGNIFICANT:
         logger.info("Making last candidate agent for player 2 to become the best agent")
-        os.system('rmdir /s /q resources\models\\best_state_value_model_p2')
         os.system(
-            'xcopy /e /y resources\models\candidate_state_value_model_p2 resources\models\\best_state_value_model_p2\\')
-        os.system('rmdir /s /q  resources\models\\best_priors_model_p2')
+            'cp resources\models\candidate_state_value_model_p2.h5 resources\models\\best_state_value_model_p2.h5')
         os.system(
-            'xcopy /e /y resources\models\candidate_priors_model_p2 resources\models\\best_priors_model_p2\\')
+            'cp resources\models\candidate_priors_model_p2.h5 resources\models\\best_priors_model_p2.h5')
+        # os.system('rmdir /s /q resources\models\\best_state_value_model_p2')
+        # os.system(
+        #     'xcopy /e /y resources\models\candidate_state_value_model_p2 resources\models\\best_state_value_model_p2\\')
+        # os.system('rmdir /s /q  resources\models\\best_priors_model_p2')
+        # os.system(
+        #     'xcopy /e /y resources\models\candidate_priors_model_p2 resources\models\\best_priors_model_p2\\')
 
-    if (ratio_1 >= limit) or (ratio_2 >= limit):
+    if (zstat1 >= Z_STAT_SIGNIFICANT) or (zstat2 >= Z_STAT_SIGNIFICANT):
         evaluate_against_baseline(iter)
 
 
@@ -284,7 +313,7 @@ def evaluate_against_baseline(iter):
     time_reduction = 1.5
     sim_B1_C2 = Simulator(config, BaselineAgent(config),
                           NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction))
-    sim_C1_B2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
+    sim_C1_B2 = Simulator(config, NeuralNetworkAgent(config, False, True, True, True, EXPLORATION_PHASE_EVALUATION, time_reduction),
                           BaselineAgent(config))
     ratio_1 = ratio_2 = 0
     count = 0
@@ -326,11 +355,11 @@ def evaluate_against_baseline(iter):
     print("The final reward ratio against baseline is " + str(ratio_1) + ", " + str(ratio_2))
 
 
-def pipeline(iteration, rounds):
+def pipeline(iterations, rounds):
     for _ in range(rounds):
-        self_play(10 * iteration)
+        self_play(10 * iterations)
         optimize(True)
-        evaluate(iteration)
+        evaluate(iterations)
 
 
 pipeline(100, 1)

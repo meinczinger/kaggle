@@ -1,2 +1,4 @@
 .idea
-/connectX/connectX/.ipynb_checkpoints/
+connectX/connectX/.ipynb_checkpoints/
+connectX/*.log
+connectX/resources*

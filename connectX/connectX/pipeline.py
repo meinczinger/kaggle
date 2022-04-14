@@ -1,13 +1,14 @@
-from simulator import Simulator
-from nn_agent import NeuralNetworkAgent
+from datetime import datetime
+from agents.simulator import Simulator
+from agents.nn_agent import NeuralNetworkAgent
 from kaggle_environments.utils import Struct
 import numpy as np
-from bitboard import BitBoard
+from agents.bitboard import BitBoard
 import os
-from logger import Logger
-from baseline import BaselineAgent
+from agents.logger import Logger
+from agents.baseline import BaselineAgent
 import pandas as pd
-from nn_model import StateValueNNModel, PriorsNNModel
+from agents.model.nn_model import StateValueNNModel, PriorsNNModel
 from pathlib import Path
 
 
@@ -191,7 +192,7 @@ def self_play(iter):
                                                EXPLORATION_PHASE_SELF_PLAY, time_reduction))
     logger.info("Starting self play")
     for i in range(iter):
-        print("Self play,", i, 'th iteration')
+        print(datetime.now(), "Self play,", i, 'th iteration')
         sim.self_play()
 
 
@@ -363,4 +364,3 @@ def pipeline(iterations, rounds):
 
 
 pipeline(100, 1)
-

@@ -1,5 +1,5 @@
 import logging
-from nn_mcts import NeuralNetworkMonteCarloTreeSearch
+from agents.nn_mcts import NeuralNetworkMonteCarloTreeSearch
 import time
 import numpy as np
 

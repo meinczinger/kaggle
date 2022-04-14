@@ -1,4 +1,4 @@
-from baseline_mcts import MonteCarloTreeSearch
+from agents.baseline_mcts import MonteCarloTreeSearch
 import logging
 import time
 import numpy as np

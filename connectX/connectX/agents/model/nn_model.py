@@ -5,7 +5,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import load_model
 from tensorflow.keras.initializers import glorot_uniform
 import numpy as np
-from bitboard import BitBoard
+from agents.bitboard import BitBoard
 from tensorflow import function
 from pathlib import Path
 import logging
@@ -370,3 +370,4 @@ class DQNResNetNNModel(NNModel):
 
         self._model.compile(loss='mse', optimizer=Adam(learning_rate=lr), metrics=['accuracy'])
 
+        

@@ -1,9 +1,9 @@
 import numpy as np
 import copy
-from simulator import Simulator
-from logger import Logger
+from agents.simulator import Simulator
+from agents.logger import Logger
 import time
-from game_tree import GameTree
+from agents.game_tree import GameTree
 
 
 class BaseMonteCarloTreeSearch:

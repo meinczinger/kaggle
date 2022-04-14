@@ -1,7 +1,7 @@
 import numpy as np
 from kaggle_environments.utils import Struct
-from bitboard import BitBoard
-from logger import Logger
+from agents.bitboard import BitBoard
+from agents.logger import Logger
 import copy
 import pandas as pd
 from pathlib import Path

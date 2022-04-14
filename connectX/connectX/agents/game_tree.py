@@ -1,4 +1,4 @@
-from bitboard import BitBoard
+from agents.bitboard import BitBoard
 from collections import defaultdict
 
 
@@ -123,3 +123,4 @@ class GameTree:
     def update_visited(self, node, value):
         self.inc_visited(node)
         self.inc_value(node, value)
+        

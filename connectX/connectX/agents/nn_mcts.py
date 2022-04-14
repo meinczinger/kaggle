@@ -1,8 +1,8 @@
-from base_mcts import BaseMonteCarloTreeSearch
+from agents.base_mcts import BaseMonteCarloTreeSearch
 import numpy as np
 from collections import defaultdict
-from bitboard import BitBoard
-from model.nn_model import StateValueNNModel, PriorsNNModel
+from agents.bitboard import BitBoard
+from agents.model.nn_model import StateValueNNModel, PriorsNNModel
 import random
 import logging
 

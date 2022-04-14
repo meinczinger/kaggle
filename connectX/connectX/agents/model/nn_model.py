@@ -40,11 +40,12 @@ class NNModel:
 
     @staticmethod
     def _channels(boards):
-        np_boards = np.array(boards)
-        np_boards = np_boards.reshape((len(boards), 6, 7))
         np_boards_channels = np.zeros((len(boards), 6, 7, 2))
-        np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
-        np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
+        for i in range(len(boards)):
+            np_boards = np.array(boards[i])
+            np_boards = np_boards.reshape((1, 6, 7))
+            np_boards_channels[i, :, :, 0] = np.where(np_boards == 1, 1, 0)
+            np_boards_channels[i, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
 
     @function
@@ -54,8 +55,9 @@ class NNModel:
     def predict(self, boards):
         np_boards_channels = self._channels(boards)
         # Get the predicted value for each state
-        pred = self._predict(np_boards_channels)
-        return np.around(pred.numpy(), decimals=4)
+        preds = self._predict(np_boards_channels)
+        # return np.around(preds.numpy(), decimals=4)
+        return [np.around(pred.numpy(), decimals=4) for pred in preds]
 
     def predict_state(self, bitboard: BitBoard, use_max=True):
         board = bitboard.to_list()

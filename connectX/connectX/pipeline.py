@@ -434,7 +434,7 @@ def evaluate(iterations):
         )
 
     if (zstat1 >= Z_STAT_SIGNIFICANT) or (zstat2 >= Z_STAT_SIGNIFICANT):
-        evaluate_against_baseline(iter)
+        evaluate_against_baseline(iterations)
 
 
 def evaluate_against_baseline(iter):
@@ -548,4 +548,5 @@ def pipeline(iterations, rounds):
         evaluate(iterations)
 
 
-pipeline(100, 1)
+# pipeline(100, 1)
+evaluate_against_baseline(100)

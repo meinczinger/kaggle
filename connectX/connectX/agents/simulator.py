@@ -13,27 +13,33 @@ GAMES_FOLDER = Path("resources/games/")
 
 class Simulator:
     def __init__(self, configuration, agent1=None, agent2=None):
-        """ Simulates games
+        """Simulates games
         If no agent is given, it does random simulation, otherwise it uses the agent(s)
         """
         self._config = configuration
         self.agents = [agent1, agent2]
-        self._logger = Logger.logger('Simulator')
+        self._logger = Logger.logger("Simulator")
 
-    def self_play(self):
+    def self_play(self, bitboard=None, callback_for_write=None, lock=None, thread_nr=0):
         obs = Struct()
         marks = [1, 2]
-        ply = 0
+
         obs.step = 0
         obs.board = [0] * 42
 
-        bitboard = BitBoard.create_empty_board(self._config.columns, self._config.rows, self._config.inarow, 1)
+        if bitboard is None:
+            bitboard = BitBoard.create_empty_board(
+                self._config.columns, self._config.rows, self._config.inarow, 1
+            )
+
+        ply = bitboard.active_player() - 1
 
         # Store all the moves
         history_list = [[], []]
 
         # Execute moves before we reach a terminal state
         while not bitboard.is_terminal_state():
+            # print("Thread", thread_nr, "making move", ply)
             obs.board = bitboard.to_list()
             obs.mark = marks[ply]
             # Get a move given by the agent
@@ -55,16 +61,45 @@ class Simulator:
             # Swap players
             ply = (ply + 1) % 2
 
+        # print("Thread", thread_nr, "game finished")
         priors = self.agents[0].priors()
         steps = len(priors)
-        priors_df = pd.DataFrame([[priors[k]['player']] + [priors[k]['step']] + priors[k]['board'] +
-                                  priors[k]['priors'] for k in priors])
+        priors_df = pd.DataFrame(
+            [
+                [priors[k]["player"]]
+                + [priors[k]["step"]]
+                + priors[k]["board"]
+                + priors[k]["priors"]
+                for k in priors
+            ]
+        )
         priors_df.iloc[:, 1] = steps - 1 - priors_df.iloc[:, 1]
-        priors_df[priors_df[0] == 1].iloc[:, 1:].\
-            to_csv(GAMES_FOLDER / 'train_priors_p1.csv', index=False, header=False, mode='a')
-        priors_df[priors_df[0] == 2].iloc[:, 1:].\
-            to_csv(GAMES_FOLDER / 'train_priors_p2.csv', index=False, header=False, mode='a')
-
+        if callback_for_write is None:
+            priors_df[priors_df[0] == 1].iloc[:, 1:].to_csv(
+                GAMES_FOLDER / "train_priors_p1.csv",
+                index=False,
+                header=False,
+                mode="a",
+            )
+            priors_df[priors_df[0] == 2].iloc[:, 1:].to_csv(
+                GAMES_FOLDER / "train_priors_p2.csv",
+                index=False,
+                header=False,
+                mode="a",
+            )
+        else:
+            callback_for_write(
+                priors_df[priors_df[0] == 1].iloc[:, 1:],
+                "train_priors_p1.csv",
+                lock,
+                thread_nr,
+            )
+            callback_for_write(
+                priors_df[priors_df[0] == 2].iloc[:, 1:],
+                "train_priors_p2.csv",
+                lock,
+                thread_nr,
+            )
         # Set reward from the first player's point of view
         if bitboard.is_draw():
             reward = 0
@@ -75,15 +110,31 @@ class Simulator:
                 reward = -1
 
         steps = len(history_list[0]) + len(history_list[1])
+        for h in history_list[0]:
+            h[0] = steps - h[0]
+
+        for h in history_list[1]:
+            h[0] = steps - h[0]
 
         for ply in range(2):
+            # print("Thread", thread_nr, "create h2")
             # Store results for later training
             h2 = pd.DataFrame(history_list[ply])
+            # print("Thread", thread_nr, "iloc")
             # Reverse the step_nr to make it the distance from the end state
-            h2.iloc[:, 0] = steps - 1 - h2.iloc[:, 0]
-            h2['value'] = reward if ply == 0 else -reward
-            games_file = 'train_state_value_p' + str(ply+1) + '.csv'
-            h2.to_csv(GAMES_FOLDER / games_file, index=False, header=False, mode='a')
+            # h2.iloc[:, 0] = steps - 1 - h2.iloc[:, 0]
+            # h2[0].apply(lambda x: steps - 1 - x, axis=1)
+            # print("Thread", thread_nr, "set value of h2")
+            h2["value"] = reward if ply == 0 else -reward
+            games_file = "train_state_value_p" + str(ply + 1) + ".csv"
+            # print("Thread", thread_nr, "before store")
+            if callback_for_write is None:
+                h2.to_csv(
+                    GAMES_FOLDER / games_file, index=False, header=False, mode="a"
+                )
+            else:
+                # print("Thread", thread_nr, "store file")
+                callback_for_write(h2, games_file, lock, thread_nr)
 
     def simulate(self, board: BitBoard, to_play: int) -> int:
         """
@@ -119,5 +170,33 @@ class Simulator:
                 return 0
             else:
                 return bitboard.last_player()
+        except Exception as ex:
+            self._logger._logger.error(ex, exc_info=True)
+
+    def generate_random_position(self, nr_of_moves: int) -> BitBoard:
+        obs = Struct()
+        player = 0
+        obs.step = 0
+        obs.mark = 1
+        bitboard = BitBoard.create_empty_board(
+            self._config.columns, self._config.rows, self._config.inarow, 1
+        )
+        try:
+            # Execute moves before we reach a terminal state
+            for _ in range(nr_of_moves):
+                if bitboard.is_terminal_state():
+                    return None
+                obs.board = bitboard.to_list()
+                # Get a random move
+                action = np.random.choice(bitboard.possible_actions())
+                # Make the move
+                bitboard.make_action(action)
+
+                # Swap players
+                player = 1 - player
+                obs.mark = (obs.mark % 2) + 1
+                # Increase the number of steps
+                obs.step += 1
+            return bitboard
         except Exception as ex:
             self._logger._logger.error(ex, exc_info=True)

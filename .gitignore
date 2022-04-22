@@ -18,3 +18,5 @@ connectX/connectX/pyvenv.cfg
 connectX/connectX/agents/__pycache__/
 connectX/connectX/agents/model/__pycache__/
 connectX/connectX/agents/model/__pycache__/
+connectX/baseline_result.log
+connectX/connectX/submission.tar.gz

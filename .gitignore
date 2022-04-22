@@ -13,10 +13,9 @@ connectX/resources/models/candidate_priors_model_p1.h5
 connectX/resources/models/candidate_priors_model_p2.h5
 connectX/resources/models/candidate_state_value_model_p1.h5
 connectX/resources/models/candidate_state_value_model_p2.h5
-error.log
 connectX/connectX/pyvenv.cfg
 connectX/connectX/agents/__pycache__/
 connectX/connectX/agents/model/__pycache__/
 connectX/connectX/agents/model/__pycache__/
-connectX/baseline_result.log
 connectX/connectX/submission.tar.gz
+connectX/*.log

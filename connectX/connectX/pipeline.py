@@ -32,27 +32,30 @@ evaluation_result_logger = Logger.info_logger(
     "evaluation_result", target="evaluation_result.log"
 )
 
-BUFFER_SIZE = 15000
+BUFFER_SIZE = 25000
 HISTORY_SIZE = 100000
 SAMPLE_SIZE = 20000
 EXPLORATION_PHASE_SELF_PLAY = 12
 EXPLORATION_PHASE_EVALUATION = 4
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-4
 TIME_REDUCTION = 1.5
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
-DEPTH_FOR_RANDOM_GAMES = 20
+DEPTH_FOR_RANDOM_GAMES = 10
+DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 6
 
 
 def cut_games_file(player):
     # cut states files
     games_file = "train_state_value" + "_p" + str(player) + ".csv"
     state_values = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
+    print("Size of", games_file, "is", len(state_values))
     state_values = state_values[-HISTORY_SIZE:]
     state_values.to_csv(GAMES_FOLDER / games_file, index=False, header=False)
     # cut priorities files
     games_file = "train_priors" + "_p" + str(player) + ".csv"
     priors = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
+    print("Size of", games_file, "is", len(state_values))
     priors = priors[-HISTORY_SIZE:]
     priors.to_csv(GAMES_FOLDER / games_file, index=False, header=False)
 
@@ -67,7 +70,7 @@ def train_state_value_model(train, player):
             GAMES_FOLDER / games_file, delimiter=",", header=None
         )
         # state_values = state_values[state_values.iloc[:, -1] != 0]
-        state_values = state_values[-BUFFER_SIZE:]
+        state_values = state_values[HISTORY_SIZE:]
         # sample_values = state_values[-BUFFER_SIZE:]
         # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
         # sample_values = None
@@ -135,7 +138,7 @@ def train_priors_model(train, player):
 
         # Ignore the first 20 % of the data
         # priors = priors[-BUFFER_SIZE:]
-        sample_values = priors[-BUFFER_SIZE:]
+        sample_values = priors[HISTORY_SIZE:]
         # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
         # sample_values = None
         # for priority, distance in zip(priorities, range(42)):
@@ -193,6 +196,9 @@ def play_writer(df, name, lock, thread_nr):
 
 
 def self_play(iter, lock, thread_nr):
+    cut_games_file(1)
+    cut_games_file(2)
+
     print("Starting self play", "iter=", iter)
     time_reduction = TIME_REDUCTION
 
@@ -334,7 +340,7 @@ def evaluate(iterations):
             random_position = None
             while random_position is None:
                 random_position = best1_best2.generate_random_position(
-                    random.randint(0, DEPTH_FOR_RANDOM_GAMES)
+                    random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION)
                 )
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -470,7 +476,7 @@ def evaluate_against_baseline(iter):
         random_position = None
         while random_position is None:
             random_position = sim_B1_C2.generate_random_position(
-                random.randint(0, DEPTH_FOR_RANDOM_GAMES)
+                random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION)
             )
 
         bitboards = [random_position for _ in range(2)]
@@ -548,5 +554,4 @@ def pipeline(iterations, rounds):
         evaluate(iterations)
 
 
-# pipeline(100, 1)
-evaluate_against_baseline(100)
+pipeline(100, 1)

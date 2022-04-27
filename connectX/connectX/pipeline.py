@@ -32,7 +32,7 @@ evaluation_result_logger = Logger.info_logger(
     "evaluation_result", target="evaluation_result.log"
 )
 
-BUFFER_SIZE = 25000
+BUFFER_SIZE = 15000
 HISTORY_SIZE = 100000
 SAMPLE_SIZE = 20000
 EXPLORATION_PHASE_SELF_PLAY = 12
@@ -55,7 +55,7 @@ def cut_games_file(player):
     # cut priorities files
     games_file = "train_priors" + "_p" + str(player) + ".csv"
     priors = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
-    print("Size of", games_file, "is", len(state_values))
+    print("Size of", games_file, "is", len(priors))
     priors = priors[-HISTORY_SIZE:]
     priors.to_csv(GAMES_FOLDER / games_file, index=False, header=False)
 
@@ -71,7 +71,7 @@ def train_state_value_model(train, player):
         )
         # state_values = state_values[state_values.iloc[:, -1] != 0]
         state_values = state_values[HISTORY_SIZE:]
-        # sample_values = state_values[-BUFFER_SIZE:]
+        # state_values = state_values[-BUFFER_SIZE:]
         # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
         # sample_values = None
         # for priority, distance in zip(priorities, range(42)):
@@ -137,7 +137,7 @@ def train_priors_model(train, player):
         # priors = np.nan_to_num(priors, copy=False, nan=0.)
 
         # Ignore the first 20 % of the data
-        # priors = priors[-BUFFER_SIZE:]
+        # sample_values = priors[-BUFFER_SIZE:]
         sample_values = priors[HISTORY_SIZE:]
         # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
         # sample_values = None

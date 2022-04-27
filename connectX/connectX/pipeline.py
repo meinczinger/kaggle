@@ -196,9 +196,6 @@ def play_writer(df, name, lock, thread_nr):
 
 
 def self_play(iter, lock, thread_nr):
-    cut_games_file(1)
-    cut_games_file(2)
-
     print("Starting self play", "iter=", iter)
     time_reduction = TIME_REDUCTION
 
@@ -227,6 +224,9 @@ def custom_hook(args):
 
 
 def parallel_self_play(iter):
+    cut_games_file(1)
+    cut_games_file(2)
+
     logger.info("Starting self play")
     NR_OF_THREADS = 5
     threading.excepthook = custom_hook

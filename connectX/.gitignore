@@ -1,0 +1,9 @@
+.ipynb_checkpoints/
+pipeline.log
+resources/*
+pyvenv.cfg
+agents/__pycache__/
+agents/model/__pycache__/
+agents/model/__pycache__/
+submission.tar.gz
+*.log

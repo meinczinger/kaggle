@@ -149,7 +149,7 @@ for i in range(50):
     random_position = None
     while random_position is None:
         random_position = sim_agent1_agent2.generate_random_position(
-            random.randint(0, 4)
+            random.randint(0, 2)
         )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:

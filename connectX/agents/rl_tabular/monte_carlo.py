@@ -2,10 +2,8 @@ from agents.rl_tabular.tabular_base import TabularBase
 import os
 
 
-if os.environ.get("GFOOTBALL_DATA_DIR", ""):
-    PICKLE_NAME = "/kaggle_simulations/agent/resources/tabular/mc_tabular.pickle"
-else:
-    PICKLE_NAME = "resources/tabular/mc_tabular.pickle"
+# PICKLE_NAME = "/kaggle_simulations/agent/resources/tabular/mc_tabular.pickle"
+PICKLE_NAME = "resources/tabular/mc_tabular.pickle"
 
 
 class TabularMonteCarlo(TabularBase):

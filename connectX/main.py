@@ -25,3 +25,8 @@ def act_mcts(observation, configuration):
     return MCTSAgent.get_instance(
         configuration, ClassicMonteCarloTreeSearch(configuration)
     ).act(observation)
+
+def act_mcts(observation, configuration):
+    return MCTSAgent.get_instance(
+        configuration, TabularMonteCarloTreeSearch(configuration, TabularMonteCarlo(configuration))
+    ).act(observation)

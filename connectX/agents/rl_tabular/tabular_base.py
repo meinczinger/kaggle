@@ -38,7 +38,7 @@ class TabularBase:
         self._prev_state = None
         self._prev_action = 0
         self._prev_reward = 0
-        self.read_pickle()
+        # self.read_pickle()
 
     def post_action(self, state, action):
         # Make action

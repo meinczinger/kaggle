@@ -17,12 +17,10 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         evaluation=False,
         use_best_player1=True,
         use_best_player2=True,
-        exploration_phase=0,
     ):
         super().__init__(configuration)
         self._self_play = self_play
         self._evaluation = evaluation
-        self._exploration_phase = exploration_phase
         self._priors_history = defaultdict()
         self._node_value_cache = defaultdict()
         self._explore_factor = 1.0

@@ -55,7 +55,7 @@ class BaseMonteCarloTreeSearch:
         self.extend_tree(2)
         # Keep extending the tree until we have time
         while time.time() < deadline:
-            self.extend_tree(100)
+            self.extend_tree(15)
         return self.get_best_action(own_player)
 
     def initialize(self, board, own_player):

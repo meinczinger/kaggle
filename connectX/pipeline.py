@@ -3,6 +3,7 @@ from agents.simulator import Simulator
 from agents.nn_agent import NeuralNetworkAgent
 from agents.mcts_agent import MCTSAgent
 from agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
+from agents.mcts.classic_mcts import ClassicMonteCarloTreeSearch
 from kaggle_environments.utils import Struct
 import numpy as np
 from agents.bitboard import BitBoard
@@ -35,7 +36,7 @@ evaluation_result_logger = Logger.info_logger(
 )
 
 BUFFER_SIZE = 15000
-HISTORY_SIZE = 100000
+HISTORY_SIZE = 0
 SAMPLE_SIZE = 20000
 EXPLORATION_PHASE_SELF_PLAY = 12
 EXPLORATION_PHASE_EVALUATION = 4
@@ -43,7 +44,7 @@ LEARNING_RATE = 5e-4
 TIME_REDUCTION = 1.5
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
-DEPTH_FOR_RANDOM_GAMES = 10
+DEPTH_FOR_RANDOM_GAMES = 6
 DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 6
 
 
@@ -209,10 +210,9 @@ def self_play(iter, lock, thread_nr):
                 evaluation=False,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=TIME_REDUCTION,
             ),
             self_play=False,
-            time_reduction=TIME_REDUCTION_EVALUATION,
+            time_reduction=TIME_REDUCTION,
         ),
     )
     for i in range(iter):
@@ -234,8 +234,12 @@ def custom_hook(args):
 
 
 def parallel_self_play(iter):
-    cut_games_file(1)
-    cut_games_file(2)
+    try:
+        cut_games_file(1)
+        cut_games_file(2)
+
+    except:
+        print("No files to cut")
 
     logger.info("Starting self play")
     NR_OF_THREADS = 5
@@ -267,7 +271,6 @@ def zstat(x, y, sample_size):
 
 def evaluate(iterations):
     logger.info("Starting evaluation")
-    time_reduction = TIME_REDUCTION_EVALUATION
 
     best1_best2 = Simulator(
         config,
@@ -279,7 +282,6 @@ def evaluate(iterations):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -292,7 +294,6 @@ def evaluate(iterations):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -307,8 +308,7 @@ def evaluate(iterations):
                 self_play=False,
                 evaluation=True,
                 use_best_player1=False,
-                use_best_player2=False,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
+                use_best_player2=True,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -321,7 +321,6 @@ def evaluate(iterations):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -337,7 +336,6 @@ def evaluate(iterations):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -348,9 +346,8 @@ def evaluate(iterations):
                 config,
                 self_play=False,
                 evaluation=True,
-                use_best_player1=False,
+                use_best_player1=True,
                 use_best_player2=False,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -482,7 +479,12 @@ def evaluate_against_baseline(iter):
     logger.info("Starting evaluation against baseline")
     sim_B1_C2 = Simulator(
         config,
-        BaselineAgent(config, TIME_REDUCTION_EVALUATION),
+        MCTSAgent(
+            config,
+            ClassicMonteCarloTreeSearch(config),
+            self_play=False,
+            time_reduction=TIME_REDUCTION_EVALUATION,
+        ),
         MCTSAgent(
             config,
             NeuralNetworkMonteCarloTreeSearch(
@@ -491,7 +493,6 @@ def evaluate_against_baseline(iter):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
@@ -507,12 +508,16 @@ def evaluate_against_baseline(iter):
                 evaluation=True,
                 use_best_player1=True,
                 use_best_player2=True,
-                exploration_phase=EXPLORATION_PHASE_EVALUATION,
             ),
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-        BaselineAgent(config, TIME_REDUCTION_EVALUATION),
+        MCTSAgent(
+            config,
+            ClassicMonteCarloTreeSearch(config),
+            self_play=False,
+            time_reduction=TIME_REDUCTION_EVALUATION,
+        ),
     )
     ratio_1 = ratio_2 = 0
     count = 0

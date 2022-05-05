@@ -61,12 +61,12 @@ class Simulator:
 
         # Set reward from the first player's point of view
         if bitboard.is_draw():
-            reward = 0.5
+            reward = 0.0
         else:
             if bitboard.last_player() == 1:
                 reward = 1.0
             else:
-                reward = 0.0
+                reward = -1.0
 
         priors = self.agents[0].MCTS().priors()
 

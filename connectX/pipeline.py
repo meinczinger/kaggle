@@ -73,7 +73,7 @@ def train_model(train, player):
         train_x_channels[:, :, :, 0] = np.where(train_x == 1, 1, 0)
         train_x_channels[:, :, :, 1] = np.where(train_x == 2, 1, 0)
         train_y = {
-            "value_head": np.array([row[42] for row in train_data]),
+            "value_head": np.array([(row[42] + 1.0) / 2.0 for row in train_data]),
             "policy_head": np.array([row[43:] for row in train_data]),
         }
         # train_y = np.where(train_y == 1, 1, 0)

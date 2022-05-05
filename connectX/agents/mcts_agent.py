@@ -28,7 +28,7 @@ class MCTSAgent:
         self._self_play = self_play
         self._step = 0
 
-    def act(self, observation, explore=False):
+    def act(self, observation, explore=False, step=0):
         """Main method to act on opponents move"""
         board = observation.board
 
@@ -36,14 +36,17 @@ class MCTSAgent:
         own_player = observation.mark
 
         # Set step
-        if self._step == 0:
-            # First step
-            self._step = own_player
+        if step != 0:
+            self._step = step
         else:
-            if self._self_play:
-                self._step += 1
+            if self._step == 0:
+                # First step
+                self._step = own_player
             else:
-                self._step += 2
+                if self._self_play:
+                    self._step += 1
+                else:
+                    self._step += 2
 
         # Starting a new game
         if self._self_play:

@@ -36,13 +36,14 @@ class Simulator:
         # Store all the moves
         history_list = [[], []]
 
+        step = 1
         # Execute moves before we reach a terminal state
         while not bitboard.is_terminal_state():
             # print("Thread", thread_nr, "making move", ply)
             obs.board = bitboard.to_list()
             obs.mark = marks[ply]
             # Get a move given by the agent
-            action = self.agents[0].act(obs)
+            action = self.agents[0].act(obs, False, step)
 
             # Make the move
             bitboard.make_action(action)
@@ -56,6 +57,7 @@ class Simulator:
 
             # Swap players
             ply = (ply + 1) % 2
+            step += 1
 
         # Set reward from the first player's point of view
         if bitboard.is_draw():

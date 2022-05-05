@@ -72,7 +72,7 @@ class Simulator:
             [
                 [priors[k]["player"]]
                 + priors[k]["board"]
-                + [reward]
+                + [reward if k["player"] == 1 else -reward]
                 + priors[k]["priors"]
                 for k in priors
             ]

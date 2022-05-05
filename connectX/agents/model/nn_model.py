@@ -1,5 +1,5 @@
-from tensorflow.keras import Sequential, Model
-from tensorflow.keras.layers import (
+from keras import Sequential, Model
+from keras.layers import (
     Dense,
     Conv2D,
     MaxPooling2D,
@@ -10,10 +10,13 @@ from tensorflow.keras.layers import (
     Add,
     Input,
     AveragePooling2D,
+    LeakyReLU,
+    add,
 )
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import load_model
-from tensorflow.keras.initializers import glorot_uniform
+from tensorflow.keras.optimizers import SGD, Adam
+from keras.models import load_model
+from keras.initializers import glorot_uniform
+from keras import regularizers
 import numpy as np
 from agents.bitboard import BitBoard
 from tensorflow import function
@@ -21,21 +24,37 @@ from pathlib import Path
 import logging
 import os
 
-if os.environ.get("GFOOTBALL_DATA_DIR", ""):
-    MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
-else:
-    MODEL_FOLDER = Path("resources/models/")
-MAX_EPOCHS = 20
+
+# MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
+MODEL_FOLDER = Path("resources/models/")
+
+
+MAX_EPOCHS = 10
+MOMENTUM = 0.9
+REG_CONST = 0.0001
+LEARNING_RATE = 0.001
+HIDDEN_CNN_LAYERS = [
+    {"filters": 75, "kernel_size": (4, 4)},
+    {"filters": 75, "kernel_size": (4, 4)},
+    {"filters": 75, "kernel_size": (4, 4)},
+    {"filters": 75, "kernel_size": (4, 4)},
+    {"filters": 75, "kernel_size": (4, 4)},
+    {"filters": 75, "kernel_size": (4, 4)},
+]
 
 
 class NNModel:
-    def __init__(self, name):
+    def __init__(self, name, reg_const=REG_CONST, learning_rate=LEARNING_RATE):
         self._name = name + ".h5"
         self._model = None
         self._history = None
         self._logger = logging.getLogger("agent")
         self._logger.setLevel(logging.DEBUG)
         self._logger.addHandler(logging.StreamHandler())
+        self.reg_const = reg_const
+        self.learning_rate = learning_rate
+        self.input_dim = (6, 7, 2)
+        self.output_dim = 7
 
     def create_model(self):
         raise NotImplementedError
@@ -52,19 +71,18 @@ class NNModel:
                 shuffle=True,
                 validation_split=0.2,
             )
-            if self._history.history["val_loss"][-1] >= val_loss * 0.995:
+            if self._history.history["val_loss"][-1] >= (val_loss * 0.995):
                 break
             val_loss = self._history.history["val_loss"][-1]
             i += 1
 
     @staticmethod
     def _channels(boards):
-        np_boards_channels = np.zeros((len(boards), 6, 7, 2))
-        for i in range(len(boards)):
-            np_boards = np.array(boards[i])
-            np_boards = np_boards.reshape((1, 6, 7))
-            np_boards_channels[i, :, :, 0] = np.where(np_boards == 1, 1, 0)
-            np_boards_channels[i, :, :, 1] = np.where(np_boards == 2, 1, 0)
+        np_boards_channels = np.zeros((1, 6, 7, 2))
+        np_boards = np.array(boards)
+        np_boards = np_boards.reshape((1, 6, 7))
+        np_boards_channels[0, :, :, 0] = np.where(np_boards == 1, 1, 0)
+        np_boards_channels[0, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
 
     @function
@@ -115,6 +133,160 @@ class NNModel:
 
     def history(self):
         return self._history
+
+
+class Residual_CNN(NNModel):
+    def __init__(self, name):
+        super().__init__(name)
+        self.hidden_layers = HIDDEN_CNN_LAYERS
+        self.num_layers = len(HIDDEN_CNN_LAYERS)
+
+    def predict(self, boards):
+        np_boards_channels = self._channels(boards)
+        # Get the predicted value for each state
+        preds = self._predict(np_boards_channels)
+        return (
+            np.around(preds[0].numpy(), decimals=4)[0][0],
+            np.around(preds[1].numpy(), decimals=4)[0],
+        )
+
+    def load(self, name=None, lr=5e-5):
+        if name is None:
+            model_file = MODEL_FOLDER / self._name
+        else:
+            model_file = MODEL_FOLDER / name
+
+        self._model = load_model(
+            model_file,
+            custom_objects={
+                "learning_rate": lr,
+            },
+        )
+
+    def residual_layer(self, input_block, filters, kernel_size):
+
+        x = self.conv_layer(input_block, filters, kernel_size)
+
+        x = Conv2D(
+            filters=filters,
+            kernel_size=kernel_size,
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="relu",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+
+        x = add([input_block, x])
+
+        x = LeakyReLU()(x)
+
+        return x
+
+    def conv_layer(self, x, filters, kernel_size):
+
+        x = Conv2D(
+            filters=filters,
+            kernel_size=kernel_size,
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="relu",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        return x
+
+    def value_head(self, x):
+
+        x = Conv2D(
+            filters=1,
+            kernel_size=(1, 1),
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        x = Flatten()(x)
+
+        x = Dense(
+            20,
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = LeakyReLU()(x)
+
+        x = Dense(
+            1,
+            activation="sigmoid",
+            name="value_head",
+        )(x)
+
+        return x
+
+    def policy_head(self, x):
+
+        x = Conv2D(
+            filters=2,
+            kernel_size=(1, 1),
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        x = Flatten()(x)
+
+        x = Dense(
+            self.output_dim,
+            activation="softmax",
+            name="policy_head",
+        )(x)
+
+        return x
+
+    def create_model(self, lr=1e-3):
+
+        main_input = Input(shape=self.input_dim, name="main_input")
+
+        x = self.conv_layer(
+            main_input,
+            self.hidden_layers[0]["filters"],
+            self.hidden_layers[0]["kernel_size"],
+        )
+
+        if len(self.hidden_layers) > 1:
+            for h in self.hidden_layers[1:]:
+                x = self.residual_layer(x, h["filters"], h["kernel_size"])
+
+        vh = self.value_head(x)
+        ph = self.policy_head(x)
+
+        self._model = Model(inputs=[main_input], outputs=[vh, ph])
+        self._model.compile(
+            loss={
+                "value_head": "mean_squared_error",
+                "policy_head": "kullback_leibler_divergence",
+            },
+            optimizer=SGD(learning_rate=self.learning_rate, momentum=MOMENTUM),
+            # loss_weights={"value_head": 0.5, "policy_head": 0.5},
+        )
 
 
 class StateValueNNModel(NNModel):

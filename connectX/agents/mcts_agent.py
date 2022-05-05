@@ -26,6 +26,7 @@ class MCTSAgent:
         self._mcts = mcts
         self._time_reduction = time_reduction
         self._self_play = self_play
+        self._step = 0
 
     def act(self, observation, explore=False):
         """Main method to act on opponents move"""
@@ -33,6 +34,16 @@ class MCTSAgent:
 
         # it seems sometimes the mark is incorrect so
         own_player = observation.mark
+
+        # Set step
+        if self._step == 0:
+            # First step
+            self._step = own_player
+        else:
+            if self._self_play:
+                self._step += 1
+            else:
+                self._step += 2
 
         # Starting a new game
         if self._self_play:
@@ -42,10 +53,10 @@ class MCTSAgent:
 
         deadline = time.time() + self._config.actTimeout - self._time_reduction
 
-        if observation.step < limit:
+        if self._step <= limit:
             self._mcts.initialize(board, own_player)
 
-        action = self._mcts.search(board, own_player, observation.step, deadline, True)
+        action = self._mcts.search(board, own_player, self._step, deadline, True)
 
         return int(action)
 

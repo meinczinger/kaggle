@@ -9,11 +9,6 @@ class BaseMonteCarloTreeSearch:
     def __init__(
         self,
         configuration,
-        self_play=False,
-        evaluation=False,
-        use_best_player1=True,
-        use_best_player2=True,
-        exploration_phase=0,
     ):
         """
         Monte carlo tree search implementation
@@ -52,7 +47,7 @@ class BaseMonteCarloTreeSearch:
                 self._tree.set_current(current_node)
         else:
             self.initialize(board, own_player)
-        self.extend_tree(2)
+        self.extend_tree(15)
         # Keep extending the tree until we have time
         while time.time() < deadline:
             self.extend_tree(15)
@@ -64,11 +59,11 @@ class BaseMonteCarloTreeSearch:
 
     """ Get the child according UBC """
 
-    def get_ucb_child(self, node, player):
+    def get_ucb_child(self, node, player, explore: bool = False):
         raise NotImplementedError
 
     def get_best_action(self, own_player):
-        child = self.get_ucb_child(self._tree.current(), own_player, False)
+        child = self.get_ucb_child(self._tree.current(), own_player, explore=False)
         return self._tree.action(child)
 
     def build_tree(self, nr_of_iter):
@@ -91,7 +86,7 @@ class BaseMonteCarloTreeSearch:
         depth = 0
         player = self._own_player
         while node is not None:
-            node = self.get_ucb_child(node, player)
+            node = self.get_ucb_child(node, player, explore=True)
             player = (player % 2) + 1
             if node is not None:
                 leaf = node

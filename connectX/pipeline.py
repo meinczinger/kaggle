@@ -1,17 +1,13 @@
-from datetime import datetime
 from agents.simulator import Simulator
-from agents.nn_agent import NeuralNetworkAgent
 from agents.mcts_agent import MCTSAgent
 from agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
 from agents.mcts.classic_mcts import ClassicMonteCarloTreeSearch
 from kaggle_environments.utils import Struct
 import numpy as np
-from agents.bitboard import BitBoard
 import os
 from agents.logger import Logger
-from agents.baseline import BaselineAgent
 import pandas as pd
-from agents.model.nn_model import StateValueNNModel, PriorsNNModel
+from agents.model.nn_model import Residual_CNN
 from pathlib import Path
 import threading
 import concurrent.futures
@@ -36,63 +32,39 @@ evaluation_result_logger = Logger.info_logger(
 )
 
 BUFFER_SIZE = 15000
-HISTORY_SIZE = 0
+HISTORY_SIZE = 1
 SAMPLE_SIZE = 20000
-EXPLORATION_PHASE_SELF_PLAY = 12
-EXPLORATION_PHASE_EVALUATION = 4
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-3
 TIME_REDUCTION = 1.5
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
-DEPTH_FOR_RANDOM_GAMES = 6
+DEPTH_FOR_RANDOM_GAMES = 4
 DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 6
+NR_OF_THREADS_FOR_SELF_PLAY = 10
+BATCH_SIZE = 32
 
 
 def cut_games_file(player):
     # cut states files
-    games_file = "train_state_value" + "_p" + str(player) + ".csv"
+    games_file = "train_prioirs_values" + "_p" + str(player) + ".csv"
     state_values = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
     print("Size of", games_file, "is", len(state_values))
     state_values = state_values[-HISTORY_SIZE:]
     state_values.to_csv(GAMES_FOLDER / games_file, index=False, header=False)
-    # cut priorities files
-    games_file = "train_priors" + "_p" + str(player) + ".csv"
-    priors = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
-    print("Size of", games_file, "is", len(priors))
-    priors = priors[-HISTORY_SIZE:]
-    priors.to_csv(GAMES_FOLDER / games_file, index=False, header=False)
 
 
-def train_state_value_model(train, player):
+def train_model(train, player):
     train_x_channels = train_y = None
     if train:
         # state_values = np.genfromtxt('resources/games/train_state_value' + '_p' + str(player) + '.csv',
         #                              delimiter=',', dtype=np.int64)
-        games_file = "train_state_value" + "_p" + str(player) + ".csv"
-        state_values = pd.read_csv(
+        games_file = "train_priors_values" + "_p" + str(player) + ".csv"
+        train_values = pd.read_csv(
             GAMES_FOLDER / games_file, delimiter=",", header=None
         )
-        # state_values = state_values[state_values.iloc[:, -1] != 0]
-        state_values = state_values[HISTORY_SIZE:]
-        # state_values = state_values[-BUFFER_SIZE:]
-        # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
-        # sample_values = None
-        # for priority, distance in zip(priorities, range(42)):
-        #     sv = state_values[state_values.iloc[:, 0] == distance].to_numpy(dtype=np.float)
-        #     sample_indices = np.random.choice(len(sv), min(int(priority), len(sv)))
-        #     print("Adding distance", distance, "with", len(sample_indices), "samples")
-        #     sv = sv[sample_indices, 1:]
-        #     if sample_values is None:
-        #         sample_values = sv
-        #     else:
-        #         sample_values = np.append(sample_values, sv, axis=0)
-        #
-        # sample_indices = np.random.choice(len(sample_values), SAMPLE_SIZE)
-        # sample_values = sample_values[sample_indices]
 
-        train_data = state_values.to_numpy(dtype=float)
-        train_data = train_data[:, 1:]
-        train_x = train_data[:, :-1]
+        train_data = train_values[HISTORY_SIZE:].to_numpy(dtype=float)
+        train_x = train_data[:, :-8]
         train_x = train_x.reshape(train_x.shape[0], 6, 7)
 
         # train_x = sample_values[:, :-1]
@@ -100,97 +72,35 @@ def train_state_value_model(train, player):
         train_x_channels = np.zeros((train_x.shape[0], 6, 7, 2))
         train_x_channels[:, :, :, 0] = np.where(train_x == 1, 1, 0)
         train_x_channels[:, :, :, 1] = np.where(train_x == 2, 1, 0)
-        train_y = train_data[:, -1:]
+        train_y = {
+            "value_head": np.array([row[42] for row in train_data]),
+            "policy_head": np.array([row[43:] for row in train_data]),
+        }
         # train_y = np.where(train_y == 1, 1, 0)
-        train_y = (train_y + 1.0) / 2.0
+        # train_y = (train_y + 1.0) / 2.0
         # train_y += 1
         # train_y = to_categorical(train_y, num_classes=3)
 
-    state_value_conv_model = StateValueNNModel(
-        "candidate_state_value_model_p" + str(player)
-    )
+    state_value_conv_model = Residual_CNN("candidate_model_p" + str(player))
 
     try:
         state_value_conv_model.load(None, LEARNING_RATE)
     except:
-        state_value_conv_model.create_model(5e-4)
+        state_value_conv_model.create_model(LEARNING_RATE)
 
     if train:
-        state_value_conv_model.train(train_x_channels, train_y, 20, 8)
+        state_value_conv_model.train(train_x_channels, train_y, 10, BATCH_SIZE)
         logger.info(
-            "Loss of state value network is "
-            + str(state_value_conv_model.history().history["loss"][-1])
+            "Loss of value head network is "
+            + str(state_value_conv_model.history().history["value_head_loss"][-1])
         )
         logger.info(
-            "MSE of state value network is "
-            + str(state_value_conv_model.history().history["mean_squared_error"][-1])
+            "Loss of policy head network is "
+            + str(state_value_conv_model.history().history["policy_head_loss"][-1])
         )
 
     state_value_conv_model.save()
     return state_value_conv_model
-
-
-def train_priors_model(train, player):
-    train_x_channels = train_y = None
-    if train:
-        games_file = "train_priors" + "_p" + str(player) + ".csv"
-        priors = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
-
-        # priors = np.genfromtxt('resources/games/train_priors' + '_p' + str(player) + '.csv', delimiter=',')
-        # priors = np.nan_to_num(priors, copy=False, nan=0.)
-
-        # Ignore the first 20 % of the data
-        # sample_values = priors[-BUFFER_SIZE:]
-        sample_values = priors[HISTORY_SIZE:]
-        # priorities = SAMPLE_SIZE * 0.2 * np.power(10, np.linspace(0, -1.5, num=42))
-        # sample_values = None
-        # for priority, distance in zip(priorities, range(42)):
-        #     sv = priors[priors.iloc[:, 0] == distance].to_numpy(dtype=np.float)
-        #     sv = np.nan_to_num(sv, copy=False, nan=0.)
-        #     sample_indices = np.random.choice(len(sv), min(int(priority), len(sv)))
-        #     sv = sv[sample_indices, 1:]
-        #     if sample_values is None:
-        #         sample_values = sv
-        #     else:
-        #         sample_values = np.append(sample_values, sv, axis=0)
-        #
-        # sample_indices = np.random.choice(len(sample_values), SAMPLE_SIZE)
-        # sample_values = sample_values[sample_indices]
-
-        train_data = sample_values.to_numpy(dtype=float)
-        train_data = train_data[:, 1:]
-        train_x = train_data[:, :42]
-        train_x = train_x.reshape(train_x.shape[0], 6, 7)
-
-        # train_x = sample_values[:, :42]
-        # train_x = train_x.reshape(train_x.shape[0], 6, 7)
-        train_x_channels = np.zeros((train_x.shape[0], 6, 7, 2))
-        train_x_channels[:, :, :, 0] = np.where(train_x == 1, 1, 0)
-        train_x_channels[:, :, :, 1] = np.where(train_x == 2, 1, 0)
-
-        train_y = train_data[:, 42:]
-
-    priors_conv_model = PriorsNNModel("candidate_priors_model_p" + str(player))
-
-    try:
-        priors_conv_model.load(None, LEARNING_RATE)
-    except:
-        priors_conv_model.create_model(5e-4)
-
-    if train:
-        priors_conv_model.train(train_x_channels, train_y, 20, 8)
-
-        logger.info(
-            "Loss of prior network is "
-            + str(priors_conv_model.history().history["loss"][-1])
-        )
-        logger.info(
-            "MSE of prior network is "
-            + str(priors_conv_model.history().history["mean_squared_error"][-1])
-        )
-
-    priors_conv_model.save()
-    return priors_conv_model
 
 
 def play_writer(df, name, lock, thread_nr):
@@ -242,21 +152,22 @@ def parallel_self_play(iter):
         print("No files to cut")
 
     logger.info("Starting self play")
-    NR_OF_THREADS = 5
     threading.excepthook = custom_hook
     lock = threading.Lock()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=NR_OF_THREADS) as executor:
-        for i in range(NR_OF_THREADS):
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=NR_OF_THREADS_FOR_SELF_PLAY
+    ) as executor:
+        for i in range(NR_OF_THREADS_FOR_SELF_PLAY):
             executor.submit(self_play, iter, lock, i)
             time.sleep(5)
 
 
 def optimize(train=True):
     logger.info("Starting training")
-    train_state_value_model(train, 1)
-    train_state_value_model(train, 2)
-    train_priors_model(train, 1)
-    train_priors_model(train, 2)
+    print("Start train for player 1")
+    train_model(train, 1)
+    print("Start train for player 2")
+    train_model(train, 2)
 
 
 def zstat(x, y, sample_size):
@@ -264,8 +175,6 @@ def zstat(x, y, sample_size):
         2 * sample_size - 2
     )
     tstat = (np.average(x) - np.average(y)) / (np.sqrt(pstd * 2 / sample_size))
-    # zstat = (np.average(x) - np.average(y)) / np.sqrt(np.std(x)**2/sample_size + np.std(y)**2/sample_size)
-    # print('tstat/zstat', tstat, zstat)
     return tstat
 
 
@@ -382,16 +291,13 @@ def evaluate(iterations):
                     random_position,
                     random_position.active_player(),
                 )
-                # winnerbb = best1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
                 # Candidate vs best
-                # winnercb = candidate1_best2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
                 winnercb = executor.submit(
                     candidate1_best2.simulate,
                     random_position,
                     random_position.active_player(),
                 )
                 # Best vs candidate
-                # winnerbc = best1_candidate2.simulate(BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1)
                 winnerbc = executor.submit(
                     best1_candidate2.simulate,
                     random_position,
@@ -456,21 +362,14 @@ def evaluate(iterations):
         evaluation_result_logger.info("--- Swap for player 1")
         logger.info("Making last candidate agent for player 1 to become the best agent")
         os.system(
-            "cp resources/models/candidate_state_value_model_p1.h5 resources/models/best_state_value_model_p1.h5"
-        )
-        os.system(
-            "cp resources/models/candidate_priors_model_p1.h5 resources/models/best_priors_model_p1.h5"
+            "cp resources/models/candidate_model_p1.h5 resources/models/best_model_p1.h5"
         )
     if zstat2 >= Z_STAT_SIGNIFICANT:
         evaluation_result_logger.info("--- Swap for player 2")
         logger.info("Making last candidate agent for player 2 to become the best agent")
         os.system(
-            "cp resources/models/candidate_state_value_model_p2.h5 resources/models/best_state_value_model_p2.h5"
+            "cp resources/models/candidate_model_p2.h5 resources/models/best_model_p2.h5"
         )
-        os.system(
-            "cp resources/models/candidate_priors_model_p2.h5 resources/models/best_priors_model_p2.h5"
-        )
-
     if (zstat1 >= Z_STAT_SIGNIFICANT) or (zstat2 >= Z_STAT_SIGNIFICANT):
         evaluate_against_baseline(iterations)
 
@@ -532,7 +431,7 @@ def evaluate_against_baseline(iter):
                 random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION)
             )
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             # B1 vs C2
             winnerBN = executor.submit(
                 sim_B1_C2.simulate, random_position, random_position.active_player()
@@ -601,9 +500,10 @@ def evaluate_against_baseline(iter):
 
 def pipeline(iterations, rounds):
     for _ in range(rounds):
-        parallel_self_play(300)
+        parallel_self_play(250)
         optimize(True)
         evaluate(iterations)
 
 
 pipeline(100, 1)
+# evaluate_against_baseline(100)

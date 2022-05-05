@@ -24,7 +24,6 @@ class Simulator:
         obs = Struct()
         marks = [1, 2]
 
-        obs.step = 0
         obs.board = [0] * 42
 
         if bitboard is None:
@@ -52,37 +51,41 @@ class Simulator:
             # history.append([obs.step, bb[0], bb[1]])
             bb_list = bitboard.to_list()
             # mirror = bitboard.mirror_board()
-            history_list[ply].append([obs.step] + bb_list)
+            history_list[ply].append([0] + bb_list)
             # history_list[ply].append([obs.step] + mirror)
-
-            # Increase the number of steps
-            obs.step += 1
 
             # Swap players
             ply = (ply + 1) % 2
 
-        # print("Thread", thread_nr, "game finished")
+        # Set reward from the first player's point of view
+        if bitboard.is_draw():
+            reward = 0.5
+        else:
+            if bitboard.last_player() == 1:
+                reward = 1.0
+            else:
+                reward = 0.0
+
         priors = self.agents[0].MCTS().priors()
-        steps = len(priors)
+
         priors_df = pd.DataFrame(
             [
                 [priors[k]["player"]]
-                + [priors[k]["step"]]
                 + priors[k]["board"]
+                + [reward]
                 + priors[k]["priors"]
                 for k in priors
             ]
         )
-        priors_df.iloc[:, 1] = steps - 1 - priors_df.iloc[:, 1]
         if callback_for_write is None:
             priors_df[priors_df[0] == 1].iloc[:, 1:].to_csv(
-                GAMES_FOLDER / "train_priors_p1.csv",
+                GAMES_FOLDER / "train_priors_values_p1.csv",
                 index=False,
                 header=False,
                 mode="a",
             )
             priors_df[priors_df[0] == 2].iloc[:, 1:].to_csv(
-                GAMES_FOLDER / "train_priors_p2.csv",
+                GAMES_FOLDER / "train_priors_values_p2.csv",
                 index=False,
                 header=False,
                 mode="a",
@@ -90,24 +93,16 @@ class Simulator:
         else:
             callback_for_write(
                 priors_df[priors_df[0] == 1].iloc[:, 1:],
-                "train_priors_p1.csv",
+                "train_priors_values_p1.csv",
                 lock,
                 thread_nr,
             )
             callback_for_write(
                 priors_df[priors_df[0] == 2].iloc[:, 1:],
-                "train_priors_p2.csv",
+                "train_priors_values_p2.csv",
                 lock,
                 thread_nr,
             )
-        # Set reward from the first player's point of view
-        if bitboard.is_draw():
-            reward = 0
-        else:
-            if bitboard.last_player() == 1:
-                reward = 1
-            else:
-                reward = -1
 
         steps = len(history_list[0]) + len(history_list[1])
         for h in history_list[0]:
@@ -128,13 +123,13 @@ class Simulator:
             h2["value"] = reward if ply == 0 else -reward
             games_file = "train_state_value_p" + str(ply + 1) + ".csv"
             # print("Thread", thread_nr, "before store")
-            if callback_for_write is None:
-                h2.to_csv(
-                    GAMES_FOLDER / games_file, index=False, header=False, mode="a"
-                )
-            else:
-                # print("Thread", thread_nr, "store file")
-                callback_for_write(h2, games_file, lock, thread_nr)
+            # if callback_for_write is None:
+            #     h2.to_csv(
+            #         GAMES_FOLDER / games_file, index=False, header=False, mode="a"
+            #     )
+            # else:
+            #     # print("Thread", thread_nr, "store file")
+            #     callback_for_write(h2, games_file, lock, thread_nr)
 
     def simulate(self, board: BitBoard, to_play: int) -> int:
         """
@@ -145,7 +140,6 @@ class Simulator:
         """
         obs = Struct()
         player = to_play - 1
-        obs.step = 0
         obs.mark = to_play
         bitboard = copy.copy(board)
         try:
@@ -164,8 +158,6 @@ class Simulator:
                 # Swap players
                 player = 1 - player
                 obs.mark = (obs.mark % 2) + 1
-                # Increase the number of steps
-                obs.step += 1
             if bitboard.is_draw():
                 return 0
             else:
@@ -176,7 +168,6 @@ class Simulator:
     def generate_random_position(self, nr_of_moves: int) -> BitBoard:
         obs = Struct()
         player = 0
-        obs.step = 0
         obs.mark = 1
         bitboard = BitBoard.create_empty_board(
             self._config.columns, self._config.rows, self._config.inarow, 1
@@ -195,8 +186,6 @@ class Simulator:
                 # Swap players
                 player = 1 - player
                 obs.mark = (obs.mark % 2) + 1
-                # Increase the number of steps
-                obs.step += 1
             return bitboard
         except Exception as ex:
             self._logger._logger.error(ex, exc_info=True)

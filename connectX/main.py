@@ -1,5 +1,6 @@
 import sys
 import os
+from agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
 
 
 sys.path.append("/kaggle_simulations/agent")
@@ -26,7 +27,8 @@ def act_mcts(observation, configuration):
         configuration, ClassicMonteCarloTreeSearch(configuration)
     ).act(observation)
 
+
 def act_mcts(observation, configuration):
     return MCTSAgent.get_instance(
-        configuration, TabularMonteCarloTreeSearch(configuration, TabularMonteCarlo(configuration))
+        configuration, NeuralNetworkMonteCarloTreeSearch(configuration)
     ).act(observation)

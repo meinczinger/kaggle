@@ -11,16 +11,16 @@ class ClassicMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
 
     """ Get the child according UBC """
 
-    def get_ucb_child(self, node, player, expand=True):
-        if expand:
+    def get_ucb_child(self, node, player, explore: bool = False):
+        if explore:
             factor = self._explore_factor
         else:
             # If we are not in expansion mode (hence in playing mode), ignore the explore factor
-            factor = 0
+            factor = 1.0
         children = self._tree.children(node)
 
         if len(children) == 0:
-            if not expand:
+            if not explore:
                 self._logger.error("get_ubc_child - no child found")
             return None
         else:

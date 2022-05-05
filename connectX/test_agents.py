@@ -23,8 +23,11 @@ config.columns = 7
 config.rows = 6
 config.inarow = 4
 config.episodeSteps = 0
-config.actTimeout = 0.5
+config.actTimeout = 2.0
 config.timeout = 2.0
+
+
+TIME_REDUCTION_EVALUATION = 1.5
 
 obs = Struct()
 obs.step = 0
@@ -109,7 +112,7 @@ obs.mark = 1
 # )
 
 agent1 = "Neural network"
-agent2 = "MCTS with tabular MonteCarlo"
+agent2 = "MCTS"
 
 sim_agent1_agent2 = Simulator(
     config,
@@ -117,21 +120,59 @@ sim_agent1_agent2 = Simulator(
         config,
         NeuralNetworkMonteCarloTreeSearch(
             config,
+            self_play=False,
+            evaluation=True,
+            use_best_player1=True,
+            use_best_player2=True,
         ),
+        self_play=False,
+        time_reduction=TIME_REDUCTION_EVALUATION,
     ),
-    # NeuralNetworkAgent(config),
-    MCTSAgent(config, TabularMonteCarloTreeSearch(config, TabularMonteCarlo(config))),
+    # NeuralNetworkAgent(
+    #     config,
+    #     self_play=False,
+    #     evaluation=False,
+    #     use_best_player1=True,
+    #     use_best_player2=True,
+    #     exploration_phase=0,
+    #     time_reduction=TIME_REDUCTION_EVALUATION,
+    # )
+    MCTSAgent(
+        config,
+        ClassicMonteCarloTreeSearch(config),
+        self_play=False,
+        time_reduction=TIME_REDUCTION_EVALUATION,
+    ),
 )
 
 sim_agent2_agent1 = Simulator(
     config,
-    MCTSAgent(config, TabularMonteCarloTreeSearch(config, TabularMonteCarlo(config))),
-    # NeuralNetworkAgent(config),
+    MCTSAgent(
+        config,
+        ClassicMonteCarloTreeSearch(config),
+        self_play=False,
+        time_reduction=TIME_REDUCTION_EVALUATION,
+    ),
+    # NeuralNetworkAgent(
+    #     config,
+    #     self_play=False,
+    #     evaluation=False,
+    #     use_best_player1=True,
+    #     use_best_player2=True,
+    #     exploration_phase=0,
+    #     time_reduction=TIME_REDUCTION_EVALUATION,
+    # ),
     MCTSAgent(
         config,
         NeuralNetworkMonteCarloTreeSearch(
             config,
+            self_play=False,
+            evaluation=True,
+            use_best_player1=True,
+            use_best_player2=True,
         ),
+        self_play=False,
+        time_reduction=TIME_REDUCTION_EVALUATION,
     ),
 )
 
@@ -145,11 +186,11 @@ count = 0
 reward_agent1_agent2 = 0
 reward_agent2_agent1 = 0
 
-for i in range(50):
+for i in range(100):
     random_position = None
     while random_position is None:
         random_position = sim_agent1_agent2.generate_random_position(
-            random.randint(0, 2)
+            random.randint(0, 6)
         )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:

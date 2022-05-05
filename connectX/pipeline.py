@@ -46,7 +46,7 @@ BATCH_SIZE = 32
 
 def cut_games_file(player):
     # cut states files
-    games_file = "train_prioirs_values" + "_p" + str(player) + ".csv"
+    games_file = "train_priors_values" + "_p" + str(player) + ".csv"
     state_values = pd.read_csv(GAMES_FOLDER / games_file, delimiter=",", header=None)
     print("Size of", games_file, "is", len(state_values))
     state_values = state_values[-HISTORY_SIZE:]

@@ -78,11 +78,11 @@ class NNModel:
 
     @staticmethod
     def _channels(boards):
-        np_boards_channels = np.zeros((1, 6, 7, 2))
+        np_boards_channels = np.zeros((len(boards), 6, 7, 2))
         np_boards = np.array(boards)
-        np_boards = np_boards.reshape((1, 6, 7))
-        np_boards_channels[0, :, :, 0] = np.where(np_boards == 1, 1, 0)
-        np_boards_channels[0, :, :, 1] = np.where(np_boards == 2, 1, 0)
+        np_boards = np_boards.reshape((len(boards), 6, 7))
+        np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
+        np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
 
     @function
@@ -146,8 +146,8 @@ class Residual_CNN(NNModel):
         # Get the predicted value for each state
         preds = self._predict(np_boards_channels)
         return (
-            np.around(preds[0].numpy(), decimals=4)[0][0],
-            np.around(preds[1].numpy(), decimals=4)[0],
+            np.around(preds[0].numpy(), decimals=4),
+            np.around(preds[1].numpy(), decimals=4),
         )
 
     def load(self, name=None, lr=5e-5):
@@ -173,7 +173,7 @@ class Residual_CNN(NNModel):
             # data_format="channels_first",
             padding="same",
             use_bias=False,
-            activation="relu",
+            activation="linear",
             kernel_regularizer=regularizers.l2(self.reg_const),
         )(x)
 
@@ -193,7 +193,7 @@ class Residual_CNN(NNModel):
             # data_format="channels_first",
             padding="same",
             use_bias=False,
-            activation="relu",
+            activation="linear",
             kernel_regularizer=regularizers.l2(self.reg_const),
         )(x)
 
@@ -285,7 +285,7 @@ class Residual_CNN(NNModel):
                 "policy_head": "kullback_leibler_divergence",
             },
             optimizer=SGD(learning_rate=self.learning_rate, momentum=MOMENTUM),
-            # loss_weights={"value_head": 0.5, "policy_head": 0.5},
+            loss_weights={"value_head": 0.5, "policy_head": 0.5},
         )
 
 

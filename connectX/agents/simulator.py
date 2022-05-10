@@ -5,6 +5,7 @@ from agents.logger import Logger
 import copy
 import pandas as pd
 from pathlib import Path
+import random
 
 
 MODEL_FOLDER = Path("resources/models/")
@@ -20,7 +21,15 @@ class Simulator:
         self.agents = [agent1, agent2]
         self._logger = Logger.logger("Simulator")
 
-    def self_play(self, bitboard=None, callback_for_write=None, lock=None, thread_nr=0):
+    def self_play(
+        self,
+        bitboard=None,
+        callback_for_write=None,
+        lock=None,
+        thread_nr=0,
+        nr_of_random_moves=0,
+        prob=0.0,
+    ):
         obs = Struct()
         marks = [1, 2]
 
@@ -33,27 +42,24 @@ class Simulator:
 
         ply = bitboard.active_player() - 1
 
-        # Store all the moves
-        history_list = [[], []]
-
         step = 1
         # Execute moves before we reach a terminal state
         while not bitboard.is_terminal_state():
             # print("Thread", thread_nr, "making move", ply)
             obs.board = bitboard.to_list()
             obs.mark = marks[ply]
+            if (step <= nr_of_random_moves) and (random.random() < prob):
+                # Get a random move
+                action = np.random.choice(bitboard.possible_actions())
+            else:
+                action = self.agents[0].act(obs, False, step)
+                step += 1
+
             # Get a move given by the agent
             action = self.agents[0].act(obs, False, step)
 
             # Make the move
             bitboard.make_action(action)
-
-            # bb = bitboard.hash()
-            # history.append([obs.step, bb[0], bb[1]])
-            bb_list = bitboard.to_list()
-            # mirror = bitboard.mirror_board()
-            history_list[ply].append([0] + bb_list)
-            # history_list[ply].append([obs.step] + mirror)
 
             # Swap players
             ply = (ply + 1) % 2
@@ -106,33 +112,6 @@ class Simulator:
                 thread_nr,
             )
 
-        steps = len(history_list[0]) + len(history_list[1])
-        for h in history_list[0]:
-            h[0] = steps - h[0]
-
-        for h in history_list[1]:
-            h[0] = steps - h[0]
-
-        for ply in range(2):
-            # print("Thread", thread_nr, "create h2")
-            # Store results for later training
-            h2 = pd.DataFrame(history_list[ply])
-            # print("Thread", thread_nr, "iloc")
-            # Reverse the step_nr to make it the distance from the end state
-            # h2.iloc[:, 0] = steps - 1 - h2.iloc[:, 0]
-            # h2[0].apply(lambda x: steps - 1 - x, axis=1)
-            # print("Thread", thread_nr, "set value of h2")
-            h2["value"] = reward if ply == 0 else -reward
-            games_file = "train_state_value_p" + str(ply + 1) + ".csv"
-            # print("Thread", thread_nr, "before store")
-            # if callback_for_write is None:
-            #     h2.to_csv(
-            #         GAMES_FOLDER / games_file, index=False, header=False, mode="a"
-            #     )
-            # else:
-            #     # print("Thread", thread_nr, "store file")
-            #     callback_for_write(h2, games_file, lock, thread_nr)
-
     def simulate(self, board: BitBoard, to_play: int) -> int:
         """
         Runs a simulation from the given board
@@ -167,27 +146,29 @@ class Simulator:
         except Exception as ex:
             self._logger._logger.error(ex, exc_info=True)
 
-    def generate_random_position(self, nr_of_moves: int) -> BitBoard:
+    def generate_random_position(self, nr_of_moves: int, prob: float) -> BitBoard:
         obs = Struct()
         player = 0
         obs.mark = 1
         bitboard = BitBoard.create_empty_board(
             self._config.columns, self._config.rows, self._config.inarow, 1
         )
-        try:
-            # Execute moves before we reach a terminal state
-            for _ in range(nr_of_moves):
-                if bitboard.is_terminal_state():
-                    return None
-                obs.board = bitboard.to_list()
+        step = 1
+        # Execute moves before we reach a terminal state
+        for _ in range(nr_of_moves):
+            if bitboard.is_terminal_state():
+                return None
+            obs.board = bitboard.to_list()
+            if random.random() < prob:
                 # Get a random move
                 action = np.random.choice(bitboard.possible_actions())
-                # Make the move
-                bitboard.make_action(action)
+            else:
+                action = self.agents[0].act(obs, False, step)
+                step += 1
+            # Make the move
+            bitboard.make_action(action)
 
-                # Swap players
-                player = 1 - player
-                obs.mark = (obs.mark % 2) + 1
-            return bitboard
-        except Exception as ex:
-            self._logger._logger.error(ex, exc_info=True)
+            # Swap players
+            player = 1 - player
+            obs.mark = (obs.mark % 2) + 1
+        return bitboard

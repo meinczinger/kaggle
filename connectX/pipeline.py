@@ -35,11 +35,13 @@ BUFFER_SIZE = 15000
 HISTORY_SIZE = 1
 SAMPLE_SIZE = 20000
 LEARNING_RATE = 1e-3
-TIME_REDUCTION = 1.5
+TIME_REDUCTION = 1.0
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
-DEPTH_FOR_RANDOM_GAMES = 4
-DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 6
+DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY = 3
+PROB_FOR_RANDOM_MOVE_SELF_PLAY = 0.3
+DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 5
+PROB_FOR_RANDOM_MOVE_EVALUATION = 0.3
 NR_OF_THREADS_FOR_SELF_PLAY = 10
 BATCH_SIZE = 32
 
@@ -108,6 +110,28 @@ def play_writer(df, name, lock, thread_nr):
         df.to_csv(GAMES_FOLDER / name, index=False, header=False, mode="a")
 
 
+def random_position_generator(depth: int, prob: float, lock=None):
+    randomGameGenerator = Simulator(
+        config,
+        MCTSAgent(
+            config,
+            NeuralNetworkMonteCarloTreeSearch(
+                config,
+                self_play=True,
+                evaluation=False,
+                use_best_player1=True,
+                use_best_player2=True,
+            ),
+            self_play=True,
+            time_reduction=TIME_REDUCTION,
+        ),
+    )
+    random_position = None
+    while random_position is None:
+        random_position = randomGameGenerator.generate_random_position(depth, prob)
+    return random_position
+
+
 def self_play(iter, lock, thread_nr):
     print("Starting self play", "iter=", iter)
     sim = Simulator(
@@ -126,17 +150,15 @@ def self_play(iter, lock, thread_nr):
         ),
     )
     for i in range(iter):
-        random_position = None
-        count = 0
-        while random_position is None:
-            random_position = sim.generate_random_position(
-                random.randint(0, DEPTH_FOR_RANDOM_GAMES)
-            )
-            count += 1
-        # print("Took", count, "attempts to get a random position, starting from ply",
-        #       random_position.ply())
         print("Thread:", thread_nr, "Play:", i)
-        sim.self_play(random_position, play_writer, lock, thread_nr)
+        sim.self_play(
+            None,
+            play_writer,
+            lock,
+            thread_nr,
+            DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY,
+            PROB_FOR_RANDOM_MOVE_SELF_PLAY,
+        )
 
 
 def custom_hook(args):
@@ -278,11 +300,10 @@ def evaluate(iterations):
         reward_candidate2_best1 = 0
 
         for j in range(round_length):
-            random_position = None
-            while random_position is None:
-                random_position = best1_best2.generate_random_position(
-                    random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION)
-                )
+            random_position = random_position_generator(
+                random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION),
+                PROB_FOR_RANDOM_MOVE_EVALUATION,
+            )
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 # Best vs best
@@ -425,13 +446,12 @@ def evaluate_against_baseline(iter):
     reward_c1_b2 = reward_b2_c1 = 0
 
     for i in range(iter):
-        random_position = None
-        while random_position is None:
-            random_position = sim_B1_C2.generate_random_position(
-                random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION)
-            )
+        random_position = random_position_generator(
+            random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION),
+            PROB_FOR_RANDOM_MOVE_EVALUATION,
+        )
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             # B1 vs C2
             winnerBN = executor.submit(
                 sim_B1_C2.simulate, random_position, random_position.active_player()
@@ -500,7 +520,7 @@ def evaluate_against_baseline(iter):
 
 def pipeline(iterations, rounds):
     for _ in range(rounds):
-        parallel_self_play(250)
+        parallel_self_play(100)
         optimize(True)
         evaluate(iterations)
 

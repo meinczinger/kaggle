@@ -23,7 +23,7 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         self._evaluation = evaluation
         self._priors_history = defaultdict()
         self._node_value_cache = defaultdict()
-        self._explore_factor = 1.0
+        self._explore_factor = 1.4
         if use_best_player1:
             value_model1 = "best_model"
         else:
@@ -88,31 +88,10 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
 
     def _leaf_value(self, node):
         board = self._tree.board(node)
-        winner = board.last_player()
+        # winner = board.last_player()
         draw = board.is_end_state() and board.is_draw()
-        return 0 if draw else -1 if winner == 0 else 1
-
-    def _set_value_prediction(self, node):
-        children = self._tree.children(node)
-        if len(children) > 0:
-            np_board = [self._tree.board_list(node) for node in children]
-            # Get boards for all the children which just got expanded
-
-            value_predictions, priors_prediction = self._model[
-                1 - (self._tree.player(node) % 2)
-            ].predict(np_board)
-            for child, value in zip(children, value_predictions):
-                self._node_value_cache[child] = 2 * value[0] - 1.0
-
-    def _set_priors_probabilities(self, node, player):
-        np_board = [self._tree.board_list(node)]
-        priors = np.around(
-            self._priors_model[player - 1].predict(np_board)[0], decimals=4
-        )
-
-        children = self._tree.children(node)
-        for child in children:
-            self._tree.set_prior(child, priors[self._tree.action(child)])
+        # return 0 if draw else -1 if winner == 0 else 1
+        return 0 if draw else 1
 
     def get_priors(self):
         return self._priors_history
@@ -172,20 +151,38 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
                 )
             return children[child]
 
+    def build_tree(self, nr_of_iter):
+        for i in range(nr_of_iter):
+            node = self.descend()
+            expanded_node, value = self.expand(node)
+            self.update(expanded_node, value)
+
+    def expand(self, node):
+        if self._tree.leaf(node):
+            return node, self._leaf_value(node)
+
+        action = super().expand(node)
+        children = self._tree.children(node)
+        if len(children) > 0:
+            value_predictions, priors_prediction = self._model[
+                1 - (self._tree.player(node) % 2)
+            ].predict([self._tree.board_list(node)])
+            for child in children:
+                self._tree.set_prior(
+                    child, priors_prediction[0][self._tree.action(child)]
+                )
+        return action, 2 * value_predictions[0][0] - 1.0
+
     def rollout(self, node):
         if self._tree.leaf(node):
             return self._leaf_value(node)
 
         value_predictions, priors_prediction = self._model[
             1 - (self._tree.player(node) % 2)
-        ].predict(self._tree.board_list(node))
+        ].predict([self._tree.board_list(node)])
         # Store the priors
-        if node != 0:
-            children = self._tree.children(self._tree.parent(node))
-            for child in children:
-                self._tree.set_prior(child, priors_prediction[self._tree.action(child)])
 
-        return 2 * value_predictions - 1.0
+        return 2 * value_predictions[0][0] - 1.0
 
     def update(self, node, value):
         # Set the value of the node

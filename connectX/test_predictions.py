@@ -222,7 +222,7 @@ def predictions():
     print(
         "Start / Candidate model, start position, value:",
         pred_value_best[0][0],
-        pred_value_candidate[0][0],
+        2.0 * pred_value_candidate[0][0] - 1.0,
         "Priors:",
         [(b, c) for b, c in zip(pred_priors_best[0], pred_priors_candidate[0])],
     )
@@ -234,7 +234,10 @@ def predictions():
 
     print(
         "First positions, values:",
-        [(b[0], c[0]) for b, c in zip(pred_values_best, pred_values_candidate)],
+        [
+            (2.0 * b[0] - 1.0, 2.0 * c[0] - 1.0)
+            for b, c in zip(pred_values_best, pred_values_candidate)
+        ],
     )
 
     # print(
@@ -257,7 +260,10 @@ def predictions():
 
     print(
         "End positions, values:",
-        [(b[0], c[0]) for b, c in zip(pred_values_best, pred_values_candidate)],
+        [
+            (2.0 * b[0] - 1.0, 2 * c[0] - 1.0)
+            for b, c in zip(pred_values_best, pred_values_candidate)
+        ],
     )
 
 

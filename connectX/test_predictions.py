@@ -5,7 +5,6 @@ from agents.simulator import Simulator
 from agents.bitboard import BitBoard
 import pandas as pd
 from collections import defaultdict
-import matplotlib.pyplot as plt
 from agents.model.nn_model import Residual_CNN
 
 

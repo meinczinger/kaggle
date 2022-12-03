@@ -1,6 +1,6 @@
 from turtle import st
-from agents.rl_tabular.state_action import StateAction
-from agents.bitboard import BitBoard
+from my_agents.rl_tabular.state_action import StateAction
+from my_agents.bitboard import BitBoard
 import copy
 import pickle
 import logging

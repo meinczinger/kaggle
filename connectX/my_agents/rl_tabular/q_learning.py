@@ -1,4 +1,4 @@
-from agents.rl_agent import RLAgent
+from my_agents.rl_agent import RLAgent
 
 
 class TabularQLeaerningAgent(RLAgent):

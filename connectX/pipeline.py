@@ -1,18 +1,21 @@
-from agents.simulator import Simulator
-from agents.mcts_agent import MCTSAgent
-from agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
-from agents.mcts.classic_mcts import ClassicMonteCarloTreeSearch
+from my_agents.simulator import Simulator
+from my_agents.mcts_agent import MCTSAgent
+from my_agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
+from my_agents.mcts.classic_mcts import ClassicMonteCarloTreeSearch
 from kaggle_environments.utils import Struct
 import numpy as np
 import os
-from agents.logger import Logger
+from my_agents.logger import Logger
 import pandas as pd
-from agents.model.nn_model import Residual_CNN
+from my_agents.model.nn_model import Residual_CNN
 from pathlib import Path
 import threading
 import concurrent.futures
 import time
 import random
+import csv
+from collections import Counter
+import gc
 
 
 GAMES_FOLDER = Path("resources/games/")
@@ -34,15 +37,15 @@ evaluation_result_logger = Logger.info_logger(
 BUFFER_SIZE = 15000
 HISTORY_SIZE = 1
 SAMPLE_SIZE = 20000
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-4
 TIME_REDUCTION = 1.0
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
-DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY = 3
-PROB_FOR_RANDOM_MOVE_SELF_PLAY = 0.3
+DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY = 10
+PROB_FOR_RANDOM_MOVE_SELF_PLAY = 0.1
 DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 5
 PROB_FOR_RANDOM_MOVE_EVALUATION = 0.3
-NR_OF_THREADS_FOR_SELF_PLAY = 10
+NR_OF_THREADS_FOR_SELF_PLAY = 20
 BATCH_SIZE = 32
 
 
@@ -57,23 +60,32 @@ def cut_games_file(player):
 
 def train_model(train, player):
     train_x_channels = train_y = None
+    state_value_conv_model = Residual_CNN("candidate_model_p" + str(player))
+
+    try:
+        state_value_conv_model.load(None, LEARNING_RATE)
+    except:
+        state_value_conv_model.create_model(LEARNING_RATE)
+
     if train:
         # state_values = np.genfromtxt('resources/games/train_state_value' + '_p' + str(player) + '.csv',
+
         #                              delimiter=',', dtype=np.int64)
         games_file = "train_priors_values" + "_p" + str(player) + ".csv"
         train_values = pd.read_csv(
             GAMES_FOLDER / games_file, delimiter=",", header=None
         )
 
-        train_data = train_values[HISTORY_SIZE:].to_numpy(dtype=float)
+        train_data = train_values.to_numpy(dtype=float)
         train_x = train_data[:, :-8]
-        train_x = train_x.reshape(train_x.shape[0], 6, 7)
+        train_x = train_x.reshape((train_x.shape[0], 6, 7, 1))
 
         # train_x = sample_values[:, :-1]
         # train_x = train_x.reshape(train_x.shape[0], 6, 7)
-        train_x_channels = np.zeros((train_x.shape[0], 6, 7, 2))
-        train_x_channels[:, :, :, 0] = np.where(train_x == 1, 1, 0)
-        train_x_channels[:, :, :, 1] = np.where(train_x == 2, 1, 0)
+        train_x_channels = state_value_conv_model._channels(train_x)
+        # train_x_channels = np.zeros((train_x.shape[0], 6, 7, 2))
+        # train_x_channels[:, :, :, 0] = np.where(train_x == 1, 1, 0)
+        # train_x_channels[:, :, :, 1] = np.where(train_x == 2, 1, 0)
         train_y = {
             "value_head": np.array([(row[42] + 1.0) / 2.0 for row in train_data]),
             "policy_head": np.array([row[43:] for row in train_data]),
@@ -83,12 +95,6 @@ def train_model(train, player):
         # train_y += 1
         # train_y = to_categorical(train_y, num_classes=3)
 
-    state_value_conv_model = Residual_CNN("candidate_model_p" + str(player))
-
-    try:
-        state_value_conv_model.load(None, LEARNING_RATE)
-    except:
-        state_value_conv_model.create_model(LEARNING_RATE)
 
     if train:
         state_value_conv_model.train(train_x_channels, train_y, 10, BATCH_SIZE)
@@ -145,7 +151,7 @@ def self_play(iter, lock, thread_nr):
                 use_best_player1=True,
                 use_best_player2=True,
             ),
-            self_play=False,
+            self_play=True,
             time_reduction=TIME_REDUCTION,
         ),
     )
@@ -156,7 +162,7 @@ def self_play(iter, lock, thread_nr):
             play_writer,
             lock,
             thread_nr,
-            DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY,
+            random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY),
             PROB_FOR_RANDOM_MOVE_SELF_PLAY,
         )
 
@@ -183,6 +189,10 @@ def parallel_self_play(iter):
             executor.submit(self_play, iter, lock, i)
             time.sleep(5)
 
+    print(gc.get_count())
+    gc.collect()
+    print(gc.get_count())
+
 
 def optimize(train=True):
     logger.info("Starting training")
@@ -200,10 +210,10 @@ def zstat(x, y, sample_size):
     return tstat
 
 
-def evaluate(iterations):
+def evaluate(iterations=200, parallelism = 4):
     logger.info("Starting evaluation")
 
-    best1_best2 = Simulator(
+    best1_best2 = [Simulator(
         config,
         MCTSAgent(
             config,
@@ -229,8 +239,8 @@ def evaluate(iterations):
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-    )
-    candidate1_best2 = Simulator(
+    ) for _ in range(parallelism)]
+    candidate1_best2 = [Simulator(
         config,
         MCTSAgent(
             config,
@@ -256,8 +266,8 @@ def evaluate(iterations):
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-    )
-    best1_candidate2 = Simulator(
+    ) for _ in range(parallelism)]
+    best1_candidate2 = [Simulator(
         config,
         MCTSAgent(
             config,
@@ -283,9 +293,9 @@ def evaluate(iterations):
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-    )
+    ) for _ in range(parallelism)]
 
-    round_length = 10
+    round_length = 5
 
     best1_best2_buffer = []
     best2_best1_buffer = []
@@ -293,77 +303,83 @@ def evaluate(iterations):
     candidate2_best1_buffer = []
     zstat1, zstat2 = 0, 0
 
-    for i in range(int(2 * iterations / round_length)):
-        reward_best1_best2 = 0
-        reward_best2_best1 = 0
-        reward_candidate1_best2 = 0
-        reward_candidate2_best1 = 0
-
-        for j in range(round_length):
-            random_position = random_position_generator(
+    for it in range(int(iterations / parallelism / round_length)):
+        for r in range(round_length):
+            random_positions = [random_position_generator(
                 random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION),
                 PROB_FOR_RANDOM_MOVE_EVALUATION,
-            )
+            ) for _ in range(parallelism)]
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                # Best vs best
-                winnerbb = executor.submit(
-                    best1_best2.simulate,
-                    random_position,
-                    random_position.active_player(),
-                )
-                # Candidate vs best
-                winnercb = executor.submit(
-                    candidate1_best2.simulate,
-                    random_position,
-                    random_position.active_player(),
-                )
-                # Best vs candidate
-                winnerbc = executor.submit(
-                    best1_candidate2.simulate,
-                    random_position,
-                    random_position.active_player(),
-                )
+            winnerbbres = [None]*parallelism
+            winnercbres = [None]*parallelism
+            winnerbcres = [None]*parallelism
 
-            winnerbb = winnerbb.result()
-            winnercb = winnercb.result()
-            winnerbc = winnerbc.result()
-            if winnerbb == 1:
-                reward_best1_best2 += 1.0
-            else:
-                if winnerbb == 0:
-                    reward_best1_best2 += 0.5
-                    reward_best2_best1 += 0.5
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3 * parallelism) as executor:
+                for j in range(parallelism):
+                    # Best vs best
+                    winnerbbres[j] = executor.submit(
+                        best1_best2[j].simulate,
+                        random_positions[j],
+                        random_positions[j].active_player(),
+                    )
+                    # Candidate vs best
+                    winnercbres[j] = executor.submit(
+                        candidate1_best2[j].simulate,
+                        random_positions[j],
+                        random_positions[j].active_player(),
+                    )
+                    # Best vs candidate
+                    winnerbcres[j] = executor.submit(
+                        best1_candidate2[j].simulate,
+                        random_positions[j],
+                        random_positions[j].active_player(),
+                    )
+
+            reward_best1_best2 = 0
+            reward_best2_best1 = 0
+            reward_candidate1_best2 = 0
+            reward_candidate2_best1 = 0
+
+            for j in range(parallelism):
+                winnerbb = winnerbbres[j].result()
+                winnercb = winnercbres[j].result()
+                winnerbc = winnerbcres[j].result()
+                if winnerbb == 1:
+                    reward_best1_best2 += 1.0
                 else:
-                    reward_best2_best1 += 1.0
+                    if winnerbb == 0:
+                        reward_best1_best2 += 0.5
+                        reward_best2_best1 += 0.5
+                    else:
+                        reward_best2_best1 += 1.0
 
-            if winnercb == 1:
-                reward_candidate1_best2 += 1.0
-            else:
-                if winnercb == 0:
-                    reward_candidate1_best2 += 0.5
+                if winnercb == 1:
+                    reward_candidate1_best2 += 1.0
+                else:
+                    if winnercb == 0:
+                        reward_candidate1_best2 += 0.5
 
-            if winnerbc == 2:
-                reward_candidate2_best1 += 1.0
-            else:
-                if winnerbc == 0:
-                    reward_candidate2_best1 += 0.5
+                if winnerbc == 2:
+                    reward_candidate2_best1 += 1.0
+                else:
+                    if winnerbc == 0:
+                        reward_candidate2_best1 += 0.5
 
-        best1_best2_buffer.append(reward_best1_best2 / float(round_length))
-        best2_best1_buffer.append(reward_best2_best1 / float(round_length))
-        candidate1_best2_buffer.append(reward_candidate1_best2 / float(round_length))
-        candidate2_best1_buffer.append(reward_candidate2_best1 / float(round_length))
+            best1_best2_buffer.append(reward_best1_best2 / float(parallelism))
+            best2_best1_buffer.append(reward_best2_best1 / float(parallelism))
+            candidate1_best2_buffer.append(reward_candidate1_best2 / float(parallelism))
+            candidate2_best1_buffer.append(reward_candidate2_best1 / float(parallelism))
 
-        print("Candidate1 vs best2 averages after round", i, candidate1_best2_buffer)
-        print("Best1 vs best2 averages after round", i, best1_best2_buffer)
-        print("Candidate2 vs best1 averages after round", i, candidate2_best1_buffer)
-        print("Best2 vs best1 averages after round", i, best2_best1_buffer)
+        print("Candidate1 vs best2 averages after round", it, candidate1_best2_buffer)
+        print("Best1 vs best2 averages after round", it, best1_best2_buffer)
+        print("Candidate2 vs best1 averages after round", it, candidate2_best1_buffer)
+        print("Best2 vs best1 averages after round", it, best2_best1_buffer)
 
-        zstat1 = zstat(candidate1_best2_buffer, best1_best2_buffer, round_length)
-        zstat2 = zstat(candidate2_best1_buffer, best2_best1_buffer, round_length)
+        zstat1 = zstat(candidate1_best2_buffer, best1_best2_buffer, (r + 1) * round_length)
+        zstat2 = zstat(candidate2_best1_buffer, best2_best1_buffer, (r + 1) * round_length)
         print(
             "zstats after round",
-            i,
+            it,
             "candidate1/best1 against best2",
             round(zstat1, 2),
             "candidate2/best2 against best1",
@@ -392,12 +408,15 @@ def evaluate(iterations):
             "cp resources/models/candidate_model_p2.h5 resources/models/best_model_p2.h5"
         )
     if (zstat1 >= Z_STAT_SIGNIFICANT) or (zstat2 >= Z_STAT_SIGNIFICANT):
-        evaluate_against_baseline(iterations)
+        print(gc.get_count())
+        gc.collect()
+        print(gc.get_count())
+        evaluate_against_baseline(iterations/2)
 
 
-def evaluate_against_baseline(iter):
+def evaluate_against_baseline(iter, parallelism=4):
     logger.info("Starting evaluation against baseline")
-    sim_B1_C2 = Simulator(
+    sim_B1_C2 = [Simulator(
         config,
         MCTSAgent(
             config,
@@ -417,8 +436,8 @@ def evaluate_against_baseline(iter):
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-    )
-    sim_C1_B2 = Simulator(
+    ) for _ in range(parallelism)]
+    sim_C1_B2 = [Simulator(
         config,
         MCTSAgent(
             config,
@@ -438,52 +457,58 @@ def evaluate_against_baseline(iter):
             self_play=False,
             time_reduction=TIME_REDUCTION_EVALUATION,
         ),
-    )
+    ) for _ in range(parallelism)]
     ratio_1 = ratio_2 = 0
     count = 0
 
     reward_b1_c2 = reward_c2_b1 = 0
     reward_c1_b2 = reward_b2_c1 = 0
 
-    for i in range(iter):
-        random_position = random_position_generator(
+    for i in range(int(iter / parallelism)):
+        random_positions = [random_position_generator(
             random.randint(0, DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION),
             PROB_FOR_RANDOM_MOVE_EVALUATION,
-        )
+        ) for _ in range(parallelism)]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        winnerBNres = [None]*parallelism
+        winnerNBres = [None]*parallelism
+
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2 * parallelism) as executor:
+            for proc in range(parallelism):
             # B1 vs C2
-            winnerBN = executor.submit(
-                sim_B1_C2.simulate, random_position, random_position.active_player()
-            )
+                winnerBNres[proc] = executor.submit(
+                    sim_B1_C2[proc].simulate, random_positions[proc], random_positions[proc].active_player()
+                )
 
-            # C1 vs B2
-            winnerNB = executor.submit(
-                sim_C1_B2.simulate, random_position, random_position.active_player()
-            )
+                # C1 vs B2
+                winnerNBres[proc] = executor.submit(
+                    sim_C1_B2[proc].simulate, random_positions[proc], random_positions[proc].active_player()
+                )
 
-        winnerBN = winnerBN.result()
-        winnerNB = winnerNB.result()
+        for proc in range(parallelism):
+            winnerBN = winnerBNres[proc].result()
+            winnerNB = winnerNBres[proc].result()
 
-        if winnerBN == 1:
-            reward_b1_c2 += 1.0
-        else:
-            if winnerBN == 0:
-                reward_b1_c2 += 0.5
-                reward_c2_b1 += 0.5
+            if winnerBN == 1:
+                reward_b1_c2 += 1.0
             else:
-                reward_c2_b1 += 1.0
+                if winnerBN == 0:
+                    reward_b1_c2 += 0.5
+                    reward_c2_b1 += 0.5
+                else:
+                    reward_c2_b1 += 1.0
 
-        if winnerNB == 1:
-            reward_c1_b2 += 1.0
-        else:
-            if winnerNB == 0:
-                reward_c1_b2 += 0.5
-                reward_b2_c1 += 0.5
+            if winnerNB == 1:
+                reward_c1_b2 += 1.0
             else:
-                reward_b2_c1 += 1.0
+                if winnerNB == 0:
+                    reward_c1_b2 += 0.5
+                    reward_b2_c1 += 0.5
+                else:
+                    reward_b2_c1 += 1.0
 
-        count += 1
+        count += parallelism
         print(
             "C1B2:",
             reward_c1_b2,
@@ -517,13 +542,94 @@ def evaluate_against_baseline(iter):
         + str(ratio_2)
     )
 
+    validate_against_perfect(500)
 
-def pipeline(iterations, rounds):
+def validate_against_perfect(nr_of_positions: int = 100, nr_of_threads: int = 10):
+    print(gc.get_count())
+    gc.collect()
+    print(gc.get_count())
+
+    obs = Struct()
+    obs.step = 0
+    obs.board = []
+
+    agents = [MCTSAgent(
+        config,
+        NeuralNetworkMonteCarloTreeSearch(
+            config,
+            self_play=False,
+            evaluation=False,
+            use_best_player1=True,
+            use_best_player2=True,
+        ),
+        self_play=False,
+        time_reduction=1.2,
+    ) for _ in range(nr_of_threads)]
+    lookup_table = "resources/lookup_table/connectx-state-action-value.txt"
+    # state_values = pd.read_csv(lookup_table, delimiter=",", header=None, names=['position', '0', '1', '2', '3', '4', '5', '6'], dtype={'position': str,
+    # '0': str, '1': str, '2': str, '3': str, '4': str, '5': str, '6': str})
+    csv_file = open(lookup_table)
+    csv_reader = csv.reader(csv_file, delimiter=',')
+    matches = Counter()
+    all_compa = Counter()
+
+    for _ in range(nr_of_positions):
+        observations = []
+        actions = []
+        best_actions = []
+        actions = {}
+
+        for i in range(nr_of_threads):
+            item = next(csv_reader)
+            position = []
+            position[:0] = item[0]
+            position = [int(p) for p in position]
+            obs.board = position
+            counter = Counter(position)
+            obs.mark = 1 if counter[1] == counter[2] else 2
+            level = counter[1] + counter[2]
+            all_compa[level] += 1
+            observations.append({'level': level, 'obs': obs})
+            if obs.mark == 1:
+                best_actions.append(np.argmax([-100 if r == '' else int(r) for r in item[1:]]))
+            else:
+                best_actions.append(np.argmax([-100 if r == '' else -int(r) for r in item[1:]]))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=nr_of_threads) as executor:    
+            for i in range(nr_of_threads):
+                actions[i] = {'level': observations[i]['level'], 'result': executor.submit(agents[i].act, observations[i]['obs'], 0, True)}
+                
+        for i in range(nr_of_threads):
+            action = actions[i]['result'].result()
+            level = actions[i]['level']
+            best_action = best_actions[i]
+            if action == best_action:
+                matches[level] += 1
+
+    for key in all_compa.keys():
+        baseline_result_logger.info("Level: " + str(key) + ", " + str(round(100 * matches[key]/all_compa[key], 2)) + "% of positions were solved with the best action")
+    
+    baseline_result_logger.info("Overall percentage is " +  str(
+        round(100 * sum(list(matches.values())) / sum(list(all_compa.values())), 2)
+        )
+    )
+    
+
+def pipeline(rounds):
+  
     for _ in range(rounds):
-        parallel_self_play(100)
+        parallel_self_play(200)
         optimize(True)
-        evaluate(iterations)
+        evaluate(200)
 
 
-pipeline(100, 1)
+pipeline(1)
 # evaluate_against_baseline(100)
+# validate_against_perfect(10, 1)
+# optimize(False)
+# os.system(
+#             "cp resources/models/candidate_model_p1.h5 resources/models/best_model_p1.h5"
+#         )
+# os.system(
+#             "cp resources/models/candidate_model_p2.h5 resources/models/best_model_p2.h5"
+#         )        

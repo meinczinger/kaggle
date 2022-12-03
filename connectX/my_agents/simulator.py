@@ -1,7 +1,7 @@
 import numpy as np
 from kaggle_environments.utils import Struct
-from agents.bitboard import BitBoard
-from agents.logger import Logger
+from my_agents.bitboard import BitBoard
+from my_agents.logger import Logger
 import copy
 import pandas as pd
 from pathlib import Path
@@ -40,9 +40,12 @@ class Simulator:
                 self._config.columns, self._config.rows, self._config.inarow, 1
             )
 
-        ply = bitboard.active_player() - 1
+        ply = 0
 
         step = 1
+
+        last_random_move = 0
+
         # Execute moves before we reach a terminal state
         while not bitboard.is_terminal_state():
             # print("Thread", thread_nr, "making move", ply)
@@ -51,12 +54,9 @@ class Simulator:
             if (step <= nr_of_random_moves) and (random.random() < prob):
                 # Get a random move
                 action = np.random.choice(bitboard.possible_actions())
+                last_random_move = step
             else:
-                action = self.agents[0].act(obs, False, step)
-                step += 1
-
-            # Get a move given by the agent
-            action = self.agents[0].act(obs, False, step)
+                action = self.agents[0].act(obs, step, step == nr_of_random_moves)
 
             # Make the move
             bitboard.make_action(action)
@@ -69,10 +69,7 @@ class Simulator:
         if bitboard.is_draw():
             reward = 0.0
         else:
-            if bitboard.last_player() == 1:
-                reward = 1.0
-            else:
-                reward = -1.0
+            reward = 1.0
 
         priors = self.agents[0].MCTS().priors()
 
@@ -80,11 +77,14 @@ class Simulator:
             [
                 [priors[k]["player"]]
                 + priors[k]["board"]
-                + [reward if priors[k]["player"] == 1 else -reward]
+                + [reward if priors[k]["player"] == bitboard.last_player() else -reward]
                 + priors[k]["priors"]
                 for k in priors
             ]
         )
+
+        priors_df = priors_df[last_random_move:]
+        
         if callback_for_write is None:
             priors_df[priors_df[0] == 1].iloc[:, 1:].to_csv(
                 GAMES_FOLDER / "train_priors_values_p1.csv",
@@ -163,7 +163,7 @@ class Simulator:
                 # Get a random move
                 action = np.random.choice(bitboard.possible_actions())
             else:
-                action = self.agents[0].act(obs, False, step)
+                action = self.agents[0].act(obs, step)
                 step += 1
             # Make the move
             bitboard.make_action(action)

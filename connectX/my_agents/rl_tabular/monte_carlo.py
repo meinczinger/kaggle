@@ -1,4 +1,4 @@
-from agents.rl_tabular.tabular_base import TabularBase
+from my_agents.rl_tabular.tabular_base import TabularBase
 import os
 
 

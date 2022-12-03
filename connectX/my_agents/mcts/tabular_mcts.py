@@ -1,8 +1,7 @@
-from sympy import re
-from agents.mcts.base_mcts import BaseMonteCarloTreeSearch
-from agents.rl_tabular.tabular_base import TabularBase
+from my_agents.mcts.base_mcts import BaseMonteCarloTreeSearch
+from my_agents.rl_tabular.tabular_base import TabularBase
 import numpy as np
-from agents.simulator import Simulator
+from my_agents.simulator import Simulator
 
 
 class TabularMonteCarloTreeSearch(BaseMonteCarloTreeSearch):

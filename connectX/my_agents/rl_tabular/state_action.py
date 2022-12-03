@@ -1,6 +1,6 @@
 import numpy as np
 from collections import defaultdict, Counter
-from agents.bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 
 
 class StateAction:

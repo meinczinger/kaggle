@@ -1,5 +1,5 @@
 import unittest
-from bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 import copy
 
 

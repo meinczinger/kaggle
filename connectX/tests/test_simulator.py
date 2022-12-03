@@ -1,6 +1,6 @@
 import unittest
-from bitboard import BitBoard
-from simulator import Simulator
+from my_agents.bitboard import BitBoard
+from my_agents.simulator import Simulator
 import copy
 from kaggle_environments.utils import Struct
 

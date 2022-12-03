@@ -1,4 +1,4 @@
-from agents.bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 from collections import defaultdict
 
 
@@ -19,7 +19,7 @@ class GameTree:
         # Create dictionaty to look up node by board
         self._node_lookup = defaultdict()
         # Create the root node
-        self._current = \
+        self._root = \
             self.add_node(False, 0,
                           BitBoard.create_from_board(self._config.columns, self._config.rows, self._config.inarow,
                                                      own_player, board), own_player)
@@ -28,10 +28,10 @@ class GameTree:
     def add_node(self, leaf, action, board, player):
         self._last_used_node_id += 1
         self._tree[self._last_used_node_id] = \
-            {'action': action, 'nr_of_visits': 0, 'value_set': False, 'value': 0,
+            {'action': action, 'nr_of_visits': 0, 'value': 0, 'prior': 0,
              'leaf': leaf, 'parent': None, 'children': [], 'bitboard': board.hash(),
              'board_list': board.bitboard_to_numpy(), 'board': board,
-             'player': player, 'prior_set': False, 'prior': 0}
+             'player': player, 'prior_set': False, 'value_set': False,}
         # Add the new node to the lookup table
         self._node_lookup[self.bitboard(self._last_used_node_id)] = self._last_used_node_id
         return self._last_used_node_id
@@ -57,13 +57,15 @@ class GameTree:
     def board_list(self, node):
         return self._tree[node]['board_list']
 
-    """ Returns the current node """
-    def current(self):
-        return self._current
+    """ Returns the root node """
+    def root(self):
+        return self._root
 
-    """ Set the current node """
-    def set_current(self, node):
-        self._current = node
+    """ Set the root node """
+    def set_root(self, node):
+        self._root = node
+        # And cut it's parent
+        self._tree[node]['parent'] = None
 
     """ Get the player of the node """
     def player(self, node):

@@ -1,8 +1,8 @@
 import numpy as np
 import copy
-from agents.logger import Logger
+from my_agents.logger import Logger
 import time
-from agents.game_tree import GameTree
+from my_agents.game_tree import GameTree
 
 
 class BaseMonteCarloTreeSearch:
@@ -22,6 +22,7 @@ class BaseMonteCarloTreeSearch:
         self._explore_factor = 1.0
         self._search_batch = 15
         self._tree = None
+        self._step = 0
 
     def search(
         self,
@@ -39,12 +40,13 @@ class BaseMonteCarloTreeSearch:
         :param reuse: whether the search tree should be reused within one episode.
         :return best action found
         """
+        self._step = step
         if reuse:
             current_node = self._tree.node_from_board(board, own_player)
             if current_node == -1:
                 self.initialize(board, own_player)
             else:
-                self._tree.set_current(current_node)
+                self._tree.set_root(current_node)
         else:
             self.initialize(board, own_player)
         self.extend_tree(self._search_batch)
@@ -63,7 +65,7 @@ class BaseMonteCarloTreeSearch:
         raise NotImplementedError
 
     def get_best_action(self, own_player):
-        child = self.get_ucb_child(self._tree.current(), own_player, explore=False)
+        child = self.get_ucb_child(self._tree.root(), own_player, explore=False)
         return self._tree.action(child)
 
     def build_tree(self, nr_of_iter):
@@ -81,7 +83,7 @@ class BaseMonteCarloTreeSearch:
 
     def descend(self):
         # If there is no child, echo back the current node
-        node = self._tree.current()
+        node = self._tree.root()
         leaf = node
         depth = 0
         player = self._own_player

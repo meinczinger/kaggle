@@ -18,15 +18,15 @@ from keras.models import load_model
 from keras.initializers import glorot_uniform
 from keras import regularizers
 import numpy as np
-from agents.bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 from tensorflow import function
 from pathlib import Path
 import logging
 import os
 
 
-# MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
-MODEL_FOLDER = Path("resources/models/")
+MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
+# MODEL_FOLDER = Path("resources/models/")
 
 
 MAX_EPOCHS = 10
@@ -53,8 +53,9 @@ class NNModel:
         self._logger.addHandler(logging.StreamHandler())
         self.reg_const = reg_const
         self.learning_rate = learning_rate
-        self.input_dim = (6, 7, 2)
         self.output_dim = 7
+        self._block_size = 5
+        self.input_dim = (6 * self._block_size, 7 * self._block_size, 2)
 
     def create_model(self):
         raise NotImplementedError
@@ -76,11 +77,27 @@ class NNModel:
             val_loss = self._history.history["val_loss"][-1]
             i += 1
 
-    @staticmethod
-    def _channels(boards):
-        np_boards_channels = np.zeros((len(boards), 6, 7, 2))
-        np_boards = np.array(boards)
-        np_boards = np_boards.reshape((len(boards), 6, 7))
+    def amplify_board(self, board):
+        board = board.reshape(6, 7)
+        new_board = np.zeros((6 * self._block_size, 7 * self._block_size))
+        dist = int((self._block_size + 1) / 2)
+        for i in range(6):
+            for j in range(7):
+                new_board[(i * self._block_size) + dist, (j * self._block_size) + dist] = board[i, j]
+                # for x in range(self._block_size):
+                #     for y in range(self._block_size):
+                #         new_board[(i * self._block_size) + x, (j * self._block_size) + y] = board[i, j]
+        return new_board
+
+    def _channels(self, boards):
+        amplified_boards = np.array([self.amplify_board(board) for board in boards])
+
+        np_boards_channels = np.zeros((len(boards), 6 * self._block_size, 7 * self._block_size, 2))
+        
+        # np_boards_channels = np.zeros((len(boards), 6, 7, 2))
+        # np_boards = np.array(boards)
+        # np_boards = np_boards.reshape((len(boards), 6, 7))
+        np_boards = amplified_boards.reshape(len(boards), 6 * self._block_size, 7 * self._block_size)
         np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
         np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
@@ -135,7 +152,7 @@ class NNModel:
         return self._history
 
 
-class Residual_CNN(NNModel):
+class Residual_CNN_Old(NNModel):
     def __init__(self, name):
         super().__init__(name)
         self.hidden_layers = HIDDEN_CNN_LAYERS
@@ -288,6 +305,204 @@ class Residual_CNN(NNModel):
             loss_weights={"value_head": 0.5, "policy_head": 0.5},
         )
 
+
+class Residual_CNN(NNModel):
+    def __init__(self, name):
+        super().__init__(name)
+        self.hidden_layers = HIDDEN_CNN_LAYERS
+        self.num_layers = len(HIDDEN_CNN_LAYERS)
+
+    def predict(self, boards):
+        np_boards_channels = self._channels(boards)
+        # Get the predicted value for each state
+        preds = self._predict(np_boards_channels)
+        return (
+            np.around(preds[0].numpy(), decimals=4),
+            np.around(preds[1].numpy(), decimals=4),
+        )
+
+    def load(self, name=None, lr=5e-5):
+        if name is None:
+            model_file = MODEL_FOLDER / self._name
+        else:
+            model_file = MODEL_FOLDER / name
+
+        self._model = load_model(
+            model_file,
+            custom_objects={
+                "learning_rate": lr,
+            },
+        )
+
+    def residual_layer(self, input_block, filters, kernel_size):
+
+        x = self.conv_layer(input_block, filters, kernel_size)
+
+        x = Conv2D(
+            filters=filters,
+            kernel_size=kernel_size,
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+
+        x = add([input_block, x])
+
+        x = LeakyReLU()(x)
+
+        return x
+
+    def conv_layer(self, x, filters, kernel_size):
+
+        x = Conv2D(
+            filters=filters,
+            kernel_size=kernel_size,
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        return x
+
+    def value_head(self, x):
+
+        x = Conv2D(
+            filters=1,
+            kernel_size=(1, 1),
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        x = Flatten()(x)
+
+        x = Dense(
+            20,
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = LeakyReLU()(x)
+
+        x = Dense(
+            1,
+            activation="sigmoid",
+            name="value_head",
+        )(x)
+
+        return x
+
+    def policy_head(self, x):
+
+        x = Conv2D(
+            filters=2,
+            kernel_size=(1, 1),
+            # data_format="channels_first",
+            padding="same",
+            use_bias=False,
+            activation="linear",
+            kernel_regularizer=regularizers.l2(self.reg_const),
+        )(x)
+
+        x = BatchNormalization(axis=3)(x)
+        x = LeakyReLU()(x)
+
+        x = Flatten()(x)
+
+        x = Dense(
+            self.output_dim,
+            activation="softmax",
+            name="policy_head",
+        )(x)
+
+        return x
+
+    def create_model(self, lr=1e-3):
+
+        main_input = Input(shape=self.input_dim, name="main_input")
+
+        # common = Sequential(
+        #         [
+        #             Conv2D(256, 4, padding="same", input_shape=(6, 7, 2)),
+        #             BatchNormalization(axis=3),
+        #             Activation("relu"),
+        #             MaxPooling2D(),
+        #             Dropout(0.3),
+        #             Conv2D(128, 3, padding="same"),
+        #             Conv2D(128, 3, padding="same"),
+        #             BatchNormalization(axis=3),
+        #             Activation("relu"),
+        #             MaxPooling2D(),
+        #             Dropout(0.3),
+        #             Conv2D(128, 3, padding="same"),
+        #             Conv2D(128, 3, padding="same"),
+        #             Conv2D(128, 3, padding="same"),
+        #             BatchNormalization(axis=3),
+        #             Activation("relu"),
+        #             Dropout(0.3),
+        #             Flatten(),
+        #             Dense(256, activation="relu"),
+        #             BatchNormalization(),
+        #             Dense(256, activation="relu"),
+        #             BatchNormalization(),
+        #         ])
+
+        common = Conv2D(256, 5, padding="same", input_shape=(6, 7, 2))(main_input)
+        common = BatchNormalization(axis=3) (common)
+        common = Activation("relu")(common)
+        common = MaxPooling2D()(common)
+        common = Dropout(0.3)(common)
+        common = Conv2D(256, 4, padding="same")(common)
+        common = Conv2D(256, 4, padding="same")(common)
+        common = BatchNormalization(axis=3)(common)
+        common = Activation("relu")(common)
+        common = MaxPooling2D()(common)
+        common = Dropout(0.3)(common)
+        common = Conv2D(128, 3, padding="same")(common)
+        common = Conv2D(128, 3, padding="same")(common)
+        common = BatchNormalization(axis=3)(common)
+        common = Activation("relu")(common)
+        common = MaxPooling2D()(common)
+        common = Dropout(0.3)(common)
+        common = Conv2D(128, 3, padding="same")(common)
+        common = Conv2D(128, 3, padding="same")(common)
+        common = Conv2D(128, 3, padding="same")(common)
+        common = BatchNormalization(axis=3)(common)
+        common = Activation("relu")(common)
+        common = Dropout(0.3)(common)
+        common = Flatten()(common)
+        common = Dense(256, activation="relu")(common)
+        common = BatchNormalization()(common)
+        common = Dense(256, activation="relu")(common)
+        common = BatchNormalization()(common)
+        vh = Dense(1, activation="sigmoid", name="value_head")(common)
+        ph = Dense(7, activation="softmax", name="policy_head")(common)
+
+        self._model = Model(inputs=[main_input], outputs=[vh, ph])
+        self._model.compile(
+            loss={
+                "value_head": "mean_squared_error",
+                "policy_head": "kullback_leibler_divergence",
+            },
+            # optimizer=SGD(learning_rate=self.learning_rate, momentum=MOMENTUM),
+            optimizer=Adam(learning_rate=lr),
+            loss_weights={"value_head": 0.65, "policy_head": 0.35},
+        )
 
 class StateValueNNModel(NNModel):
     def __init__(self, name):

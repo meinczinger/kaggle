@@ -1,5 +1,5 @@
 import unittest
-from agents.monte_carlo_agent import StateAction
+from my_agents.monte_carlo_agent import StateAction
 
 
 class TestStateAction(unittest.TestCase):

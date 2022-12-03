@@ -1,6 +1,6 @@
-from agents.mcts.base_mcts import BaseMonteCarloTreeSearch
+from my_agents.mcts.base_mcts import BaseMonteCarloTreeSearch
 import numpy as np
-from agents.simulator import Simulator
+from my_agents.simulator import Simulator
 
 
 class ClassicMonteCarloTreeSearch(BaseMonteCarloTreeSearch):

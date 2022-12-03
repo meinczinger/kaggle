@@ -1,4 +1,4 @@
-from agents.bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 from search import MiniMax
 
 

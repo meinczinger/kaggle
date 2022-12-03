@@ -1,4 +1,4 @@
-from agents.mcts.base_mcts import BaseMonteCarloTreeSearch
+from my_agents.mcts.base_mcts import BaseMonteCarloTreeSearch
 import logging
 import time
 import numpy as np
@@ -28,7 +28,7 @@ class MCTSAgent:
         self._self_play = self_play
         self._step = 0
 
-    def act(self, observation, explore=False, step=0):
+    def act(self, observation, step=0, initialize=False):
         """Main method to act on opponents move"""
         board = observation.board
 
@@ -56,7 +56,7 @@ class MCTSAgent:
 
         deadline = time.time() + self._config.actTimeout - self._time_reduction
 
-        if self._step <= limit:
+        if (self._step <= limit) or initialize:
             self._mcts.initialize(board, own_player)
 
         action = self._mcts.search(board, own_player, self._step, deadline, True)

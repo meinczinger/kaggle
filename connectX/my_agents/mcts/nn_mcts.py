@@ -1,13 +1,13 @@
-from agents.mcts.base_mcts import BaseMonteCarloTreeSearch
+from my_agents.mcts.base_mcts import BaseMonteCarloTreeSearch
 import numpy as np
 from collections import defaultdict
-from agents.bitboard import BitBoard
-from agents.model.nn_model import Residual_CNN
+from my_agents.bitboard import BitBoard
+from my_agents.model.nn_model import Residual_CNN
 import random
 import logging
 
 RANDOM_MOVE_PROB = 0.05
-
+NUMBER_OF_MOVES_WITH_TEMPRETURE_ONE = 16
 
 class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
     def __init__(
@@ -23,7 +23,7 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         self._evaluation = evaluation
         self._priors_history = defaultdict()
         self._node_value_cache = defaultdict()
-        self._explore_factor = 1.4
+        self._explore_factor = 1.0
         if use_best_player1:
             value_model1 = "best_model"
         else:
@@ -60,23 +60,27 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         return action
 
     def get_best_action(self, own_player):
-        children = self._tree.children(self._tree.current())
+        children = self._tree.children(self._tree.root())
         if len(children) == 0:
             return None
         else:
             sum_of_visits = sum([self._tree.visited(c) for c in children])
             probs = [self._tree.visited(c) / sum_of_visits for c in children]
-            child = children[np.argmax(probs)]
+            if self._self_play and (self._step < NUMBER_OF_MOVES_WITH_TEMPRETURE_ONE):
+                child = children[np.random.choice(np.arange(len(children)), p=probs)]
+            else:
+                child = children[np.argmax(probs)]
         return self._tree.action(child)
 
     def _add_to_priors_history(self, board, step):
-        children = self._tree.children(self._tree.current())
+        children = self._tree.children(self._tree.root())
         sum_of_visits = sum([self._tree.visited(child) for child in children])
         priors = [0.0] * 7
         for child in children:
             priors[self._tree.action(child)] = self._tree.visited(child) / sum_of_visits
         self._priors_history[self._move] = {
-            "player": self._tree.player(self._tree.current()),
+            # player is the player who has played before this action
+            "player": (self._tree.player(self._tree.root()) % 2) + 1,
             "step": step,
             "board": board,
             "priors": priors,
@@ -115,10 +119,9 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
                 explore_factor = 1.0
             # The tree is populated from the perspective of the first player, if have this player, maximize the value,
             # otherwise minimize
-            if self._self_play:
-                noise = np.random.dirichlet([0.03] * 7)
-                child = np.argmax(
-                    [
+            if self._self_play and (node == self._tree.root()):
+                noise = np.random.dirichlet([2] * 7)
+                ucb = [
                         (
                             self._tree.value(c) / self._tree.visited(c)
                             if self._tree.visited(c) > 0
@@ -133,6 +136,8 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
                         / (self._tree.visited(c) + 1)
                         for c in children
                     ]
+                child = np.argmax(
+                    ucb
                 )
             else:
                 child = np.argmax(
@@ -154,35 +159,36 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
     def build_tree(self, nr_of_iter):
         for i in range(nr_of_iter):
             node = self.descend()
-            expanded_node, value = self.expand(node)
-            self.update(expanded_node, value)
+            _ = self.expand(node)
+            value = self.rollout(node)
+            self.update(node, value)
 
-    def expand(self, node):
-        if self._tree.leaf(node):
-            return node, self._leaf_value(node)
+            # node = self.descend()
+            # expanded_node, value = self.expand(node)
+            # self.update(expanded_node, value)
 
-        action = super().expand(node)
-        children = self._tree.children(node)
-        if len(children) > 0:
-            value_predictions, priors_prediction = self._model[
-                1 - (self._tree.player(node) % 2)
-            ].predict([self._tree.board_list(node)])
-            for child in children:
-                self._tree.set_prior(
-                    child, priors_prediction[0][self._tree.action(child)]
-                )
-        return action, 2 * value_predictions[0][0] - 1.0
 
     def rollout(self, node):
         if self._tree.leaf(node):
             return self._leaf_value(node)
 
-        value_predictions, priors_prediction = self._model[
-            1 - (self._tree.player(node) % 2)
-        ].predict([self._tree.board_list(node)])
-        # Store the priors
-
+        children = self._tree.children(node)
+        if len(children) > 0:
+            # If the next player is 1 (2), use the second (first) model
+            value_predictions, priors_prediction = self._model[
+                self._tree.player(node) % 2
+            ].predict([self._tree.board_list(node)])
+            for child in children:
+                self._tree.set_prior(
+                    child, priors_prediction[0][self._tree.action(child)]
+                )
         return 2 * value_predictions[0][0] - 1.0
+        # value_predictions, priors_prediction = self._model[
+        #     1 - (self._tree.player(node) % 2)
+        # ].predict([self._tree.board_list(node)])
+        # # Store the priors
+
+        # return 2 * value_predictions[0][0] - 1.0
 
     def update(self, node, value):
         # Set the value of the node

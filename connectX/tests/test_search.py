@@ -1,6 +1,6 @@
 import unittest
-from agents.SimpleState import SimpleState
-from agents.search import MiniMax
+from my_agents.SimpleState import SimpleState
+from my_agents.search import MiniMax
 
 
 class TestState(unittest.TestCase):

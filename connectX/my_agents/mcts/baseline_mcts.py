@@ -1,9 +1,9 @@
-from agents.bitboard import BitBoard
+from my_agents.bitboard import BitBoard
 import numpy as np
 import copy
-from agents.simulator import Simulator
+from my_agents.simulator import Simulator
 from collections import defaultdict
-from agents.logger import Logger
+from my_agents.logger import Logger
 import time
 
 

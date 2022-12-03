@@ -1,5 +1,5 @@
-from agents.bitboard import BitBoard
-from agents.rl_tabular.tabular_base import TabularBase
+from my_agents.bitboard import BitBoard
+from my_agents.rl_tabular.tabular_base import TabularBase
 
 
 EPSILON = 0.05

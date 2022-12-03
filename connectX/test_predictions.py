@@ -1,11 +1,17 @@
 from tensorflow.keras.models import load_model
 import numpy as np
 from kaggle_environments.utils import Struct
-from agents.simulator import Simulator
-from agents.bitboard import BitBoard
+from my_agents.simulator import Simulator
+from my_agents.bitboard import BitBoard
 import pandas as pd
-from collections import defaultdict
-from agents.model.nn_model import Residual_CNN
+from collections import defaultdict, Counter
+from my_agents.model.nn_model import Residual_CNN
+import csv
+from my_agents.mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
+from my_agents.mcts_agent import MCTSAgent
+from my_agents.logger import Logger
+import threading
+import concurrent.futures
 
 
 config = Struct()
@@ -15,29 +21,9 @@ config.inarow = 4
 config.timeout = 2.0
 config.actTimeout = 2.0
 
-
-def profile():
-    agent = NeuralNetworkAgent(config, False, True)
-    agent.act()
-
-
-def test_self_play():
-    sim = Simulator(
-        config,
-        NeuralNetworkAgent(config, False, True),
-        NeuralNetworkAgent(config, False, True),
-    )
-    sim.self_play()
-
-
-def test_simulator():
-    candidate_agent = NeuralNetworkAgent(config, True)
-    best_agent = NeuralNetworkAgent(config)
-    sim = Simulator(config, candidate_agent, best_agent)
-    winner = sim.simulate(
-        BitBoard.create_empty_board(config.columns, config.rows, config.inarow, 1), 1
-    )
-    print(winner)
+obs = Struct()
+obs.step = 0
+obs.board = []
 
 
 def predictions():
@@ -189,7 +175,7 @@ def predictions():
             0,
             1,
             1,
-            0,
+            1,
             0,
             0,
             0,
@@ -214,20 +200,20 @@ def predictions():
     #                                            2, 1, 2, 1, 1, 1, 2])
     # end_position = BitBoard.bitboard_to_numpy2d(board_end_position.hash(), 6, 7).reshape(1, 6, 7, 1)
 
-    pred_value_best, pred_priors_best = best_model_p1.predict([empty_board])
-    pred_value_candidate, pred_priors_candidate = candidate_model_p1.predict(
-        [empty_board]
-    )
-    print(
-        "Start / Candidate model, start position, value:",
-        pred_value_best[0][0],
-        2.0 * pred_value_candidate[0][0] - 1.0,
-        "Priors:",
-        [(b, c) for b, c in zip(pred_priors_best[0], pred_priors_candidate[0])],
-    )
+    # pred_value_best, pred_priors_best = best_model_p2.predict([empty_board])
+    # pred_value_candidate, pred_priors_candidate = candidate_model_p2.predict(
+    #     [empty_board]
+    # )
+    # print(
+    #     "Start / Candidate model, start position, value:",
+    #     2.0 * pred_value_best[0][0] - 1.0,
+    #     2.0 * pred_value_candidate[0][0] - 1.0,
+    #     "Priors:",
+    #     [(b, c) for b, c in zip(pred_priors_best[0], pred_priors_candidate[0])],
+    # )
 
-    pred_values_best, pred_priors_best = best_model_p2.predict(first_positions)
-    pred_values_candidate, pred_priors_candidate = candidate_model_p2.predict(
+    pred_values_best, _ = best_model_p1.predict(first_positions)
+    pred_values_candidate, _ = candidate_model_p1.predict(
         first_positions
     )
 
@@ -239,9 +225,17 @@ def predictions():
         ],
     )
 
+    # pred_values_best, pred_priors_best = best_model_p2.predict(second_positions)
+    # pred_values_candidate, pred_priors_candidate = candidate_model_p2.predict(
+    #     second_positions
+    # )
+
     # print(
     #     "Second positions, state values:",
-    #     np.around(state_value_model.predict([second_positions]), decimals=4),
+    #     [
+    #         (2.0 * b[0] - 1.0, 2.0 * c[0] - 1.0)
+    #         for b, c in zip(pred_values_best, pred_values_candidate)
+    #     ],
     # )
     # print(
     #     "Second positions, priors:",
@@ -252,13 +246,13 @@ def predictions():
     #     "End position, state values:",
     #     np.around(state_value_model.predict([end_pos]), decimals=4),
     # )
-    pred_values_best, pred_priors_best = best_model_p2.predict(end_pos)
-    pred_values_candidate, pred_priors_candidate = candidate_model_p2.predict(
+    pred_values_best, pred_priors_best = best_model_p1.predict(end_pos)
+    pred_values_candidate, pred_priors_candidate = candidate_model_p1.predict(
         first_positions
     )
 
     print(
-        "End positions, values:",
+        "End positions, values (expected: -1.0):",
         [
             (2.0 * b[0] - 1.0, 2 * c[0] - 1.0)
             for b, c in zip(pred_values_best, pred_values_candidate)
@@ -268,7 +262,7 @@ def predictions():
 
 def first_positions():
     state_values = pd.read_csv(
-        "resources/games/train_priors_values_p2.csv", delimiter=",", header=None
+        "resources/games/train_priors_values_p1.csv", delimiter=",", header=None
     )
     # nr_of_records = len(state_values)
     # ignore = int(nr_of_records * 0.2)
@@ -598,10 +592,6 @@ def first_positions():
         # counts[i]['win'] = 0
         # counts[i]['loss'] = 0
 
-    plt.clf()
-    plt.figure(figsize=(15, 5), dpi=80, facecolor="w", edgecolor="k")
-    plt.grid()
-
     # for i in range(len(state_values)):
     for index, row in state_values.iterrows():
         for j in range(len(first_pos_win)):
@@ -612,7 +602,7 @@ def first_positions():
                     counts[j]["win"] += 1
                 else:
                     # if state_values.loc[i, 42] == -1:
-                    if row.values[42] == 0.0:
+                    if row.values[42] == -1.0:
                         counts[j]["loss"] += 1
         if (index % 2000) == 0:
             for k in counts:
@@ -625,12 +615,6 @@ def first_positions():
                 # counts[k] = {'win': 0, 'loss': 0}
 
     for k in counts:
-        plt.plot(averages[k], linestyle="--")
-        plt.legend(legend, loc="upper left")
-
-    plt.show()
-
-    for k in counts:
         ratio = (
             0.5
             if counts[k]["win"] == counts[k]["loss"] == 0
@@ -639,7 +623,67 @@ def first_positions():
         print(k, counts[k]["win"], counts[k]["loss"], ratio)
 
 
+def validate_against_perfect(nr_of_positions: int = 100, nr_of_threads: int = 10):
+    logger = Logger.info_logger("pipeline", target="score_against_perfect.log")
+    agents = [MCTSAgent(
+        config,
+        NeuralNetworkMonteCarloTreeSearch(
+            config,
+            self_play=False,
+            evaluation=False,
+            use_best_player1=True,
+            use_best_player2=True,
+        ),
+        self_play=False,
+        time_reduction=1.2,
+    ) for _ in range(nr_of_threads)]
+    lookup_table = "resources/lookup_table/connectx-state-action-value.txt"
+    # state_values = pd.read_csv(lookup_table, delimiter=",", header=None, names=['position', '0', '1', '2', '3', '4', '5', '6'], dtype={'position': str,
+    # '0': str, '1': str, '2': str, '3': str, '4': str, '5': str, '6': str})
+    csv_file = open(lookup_table)
+    csv_reader = csv.reader(csv_file, delimiter=',')
+    matches = Counter()
+    all_compa = Counter()
+
+    for _ in range(nr_of_positions):
+        observations = []
+        actions = []
+        best_actions = []
+        actions = {}
+
+        for i in range(nr_of_threads):
+            item = next(csv_reader)
+            position = []
+            position[:0] = item[0]
+            position = [int(p) for p in position]
+            obs.board = position
+            counter = Counter(position)
+            obs.mark = 1 if counter[1] == counter[2] else 2
+            level = counter[1] + counter[2]
+            all_compa[level] += 1
+            observations.append({'level': level, 'obs': obs})
+            if obs.mark == 1:
+                best_actions.append(np.argmax([-100 if r == '' else int(r) for r in item[1:]]))
+            else:
+                best_actions.append(np.argmax([-100 if r == '' else -int(r) for r in item[1:]]))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=nr_of_threads) as executor:    
+            for i in range(nr_of_threads):
+                actions[i] = {'level': observations[i]['level'], 'result': executor.submit(agents[i].act, observations[i]['obs'], 0, True)}
+                
+        for i in range(nr_of_threads):
+            action = actions[i]['result'].result()
+            level = actions[i]['level']
+            best_action = best_actions[i]
+            if action == best_action:
+                matches[level] += 1
+
+    for key in all_compa.keys():
+        logger.info("Level:" + str(key) + "," + str(round(100 * matches[key]/all_compa[key], 2)) + "% of positions were solved with the best action")
+
 # test_self_play()
 # test_simulator()
-predictions()
+# predictions()
 # first_positions()
+
+validate_against_perfect(200)

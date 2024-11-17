@@ -1,5 +1,8 @@
+from tensorflow.python.keras.optimizers import SGD, Adam
+from tensorflow import function
+
 from keras import Sequential, Model
-from keras.layers import (
+from tensorflow.python.keras.layers import (
     Dense,
     Conv2D,
     MaxPooling2D,
@@ -13,13 +16,11 @@ from keras.layers import (
     LeakyReLU,
     add,
 )
-from tensorflow.keras.optimizers import SGD, Adam
-from keras.models import load_model
-from keras.initializers import glorot_uniform
+from tensorflow.python.keras.models import load_model
+from tensorflow.python.keras.initializers import glorot_uniform
 from keras import regularizers
 import numpy as np
 from my_agents.bitboard import BitBoard
-from tensorflow import function
 from pathlib import Path
 import logging
 import os

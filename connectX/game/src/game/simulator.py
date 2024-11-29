@@ -1,32 +1,40 @@
 import numpy as np
 from kaggle_environments.utils import Struct
-from game.board import BitBoard
 
 # from my_agents.logger import Logger
 import copy
 import pandas as pd
 from pathlib import Path
 import random
+import threading
 
-
-MODEL_FOLDER = Path("resources/models/")
-GAMES_FOLDER = Path("resources/games/")
+from game.board import BitBoard
+from game.games import GameManager
 
 
 class Simulator:
-    def __init__(self, configuration, agent1=None, agent2=None):
+    def __init__(
+        self,
+        configuration: Struct,
+        games_folder: Path,
+        model_folder: Path,
+        agent1=None,
+        agent2=None,
+    ):
         """Simulates games
         If no agent is given, it does random simulation, otherwise it uses the agent(s)
         """
         self._config = configuration
+        self.games_folder = games_folder
+        self.model_folder = model_folder
         self.agents = [agent1, agent2]
         # self._logger = Logger.logger("Simulator")
 
     def self_play(
         self,
         bitboard=None,
-        callback_for_write=None,
-        lock=None,
+        writer: GameManager = None,
+        lock: threading.Lock = None,
         thread_nr=0,
         nr_of_random_moves=0,
         prob=0.0,
@@ -86,31 +94,29 @@ class Simulator:
 
         priors_df = priors_df[last_random_move:]
 
-        if callback_for_write is None:
+        if writer is None:
             priors_df[priors_df[0] == 1].iloc[:, 1:].to_csv(
-                GAMES_FOLDER / "train_priors_values_p1.csv",
+                self.games_folder / "train_priors_values_p1.csv",
                 index=False,
                 header=False,
                 mode="a",
             )
             priors_df[priors_df[0] == 2].iloc[:, 1:].to_csv(
-                GAMES_FOLDER / "train_priors_values_p2.csv",
+                self.games_folder / "train_priors_values_p2.csv",
                 index=False,
                 header=False,
                 mode="a",
             )
         else:
-            callback_for_write(
+            writer.save(
                 priors_df[priors_df[0] == 1].iloc[:, 1:],
                 "train_priors_values_p1.csv",
                 lock,
-                thread_nr,
             )
-            callback_for_write(
+            writer.save(
                 priors_df[priors_df[0] == 2].iloc[:, 1:],
                 "train_priors_values_p2.csv",
                 lock,
-                thread_nr,
             )
 
     def simulate(self, board: BitBoard, to_play: int) -> int:

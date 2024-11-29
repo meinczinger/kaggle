@@ -19,12 +19,7 @@ import gc
 
 
 GAMES_FOLDER = Path("resources/games/")
-config = Struct()
-config.columns = 7
-config.rows = 6
-config.inarow = 4
-config.timeout = 2.0
-config.actTimeout = 2.0
+
 
 logger = Logger.info_logger("pipeline", target="pipeline.log")
 baseline_result_logger = Logger.info_logger(

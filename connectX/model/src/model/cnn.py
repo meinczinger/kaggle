@@ -1,5 +1,8 @@
+from keras.api.optimizers import SGD, Adam
+from tensorflow import function
+
 from keras import Sequential, Model
-from keras.layers import (
+from keras.api.layers import (
     Dense,
     Conv2D,
     MaxPooling2D,
@@ -13,20 +16,18 @@ from keras.layers import (
     LeakyReLU,
     add,
 )
-from tensorflow.keras.optimizers import SGD, Adam
-from keras.models import load_model
-from keras.initializers import glorot_uniform
+from keras.api.models import load_model
+from keras.api.initializers import glorot_uniform
 from keras import regularizers
 import numpy as np
-from my_agents.bitboard import BitBoard
-from tensorflow import function
+from game.board.bitboard import BitBoard
 from pathlib import Path
 import logging
 import os
 
 
-MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
-# MODEL_FOLDER = Path("resources/models/")
+# MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
+MODEL_FOLDER = Path("resources/models/")
 
 
 MAX_EPOCHS = 10
@@ -43,7 +44,7 @@ HIDDEN_CNN_LAYERS = [
 ]
 
 
-class NNModel:
+class CNNModel:
     def __init__(self, name, reg_const=REG_CONST, learning_rate=LEARNING_RATE):
         self._name = name + ".h5"
         self._model = None
@@ -83,7 +84,9 @@ class NNModel:
         dist = int((self._block_size + 1) / 2)
         for i in range(6):
             for j in range(7):
-                new_board[(i * self._block_size) + dist, (j * self._block_size) + dist] = board[i, j]
+                new_board[
+                    (i * self._block_size) + dist, (j * self._block_size) + dist
+                ] = board[i, j]
                 # for x in range(self._block_size):
                 #     for y in range(self._block_size):
                 #         new_board[(i * self._block_size) + x, (j * self._block_size) + y] = board[i, j]
@@ -92,12 +95,16 @@ class NNModel:
     def _channels(self, boards):
         amplified_boards = np.array([self.amplify_board(board) for board in boards])
 
-        np_boards_channels = np.zeros((len(boards), 6 * self._block_size, 7 * self._block_size, 2))
-        
+        np_boards_channels = np.zeros(
+            (len(boards), 6 * self._block_size, 7 * self._block_size, 2)
+        )
+
         # np_boards_channels = np.zeros((len(boards), 6, 7, 2))
         # np_boards = np.array(boards)
         # np_boards = np_boards.reshape((len(boards), 6, 7))
-        np_boards = amplified_boards.reshape(len(boards), 6 * self._block_size, 7 * self._block_size)
+        np_boards = amplified_boards.reshape(
+            len(boards), 6 * self._block_size, 7 * self._block_size
+        )
         np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
         np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
@@ -152,7 +159,7 @@ class NNModel:
         return self._history
 
 
-class Residual_CNN_Old(NNModel):
+class Residual_CNN_Old(CNNModel):
     def __init__(self, name):
         super().__init__(name)
         self.hidden_layers = HIDDEN_CNN_LAYERS
@@ -306,7 +313,7 @@ class Residual_CNN_Old(NNModel):
         )
 
 
-class Residual_CNN(NNModel):
+class Residual_CNN(CNNModel):
     def __init__(self, name):
         super().__init__(name)
         self.hidden_layers = HIDDEN_CNN_LAYERS
@@ -463,7 +470,7 @@ class Residual_CNN(NNModel):
         #         ])
 
         common = Conv2D(256, 5, padding="same", input_shape=(6, 7, 2))(main_input)
-        common = BatchNormalization(axis=3) (common)
+        common = BatchNormalization(axis=3)(common)
         common = Activation("relu")(common)
         common = MaxPooling2D()(common)
         common = Dropout(0.3)(common)
@@ -504,7 +511,8 @@ class Residual_CNN(NNModel):
             loss_weights={"value_head": 0.65, "policy_head": 0.35},
         )
 
-class StateValueNNModel(NNModel):
+
+class StateValueNNModel(CNNModel):
     def __init__(self, name):
         super().__init__(name)
 
@@ -544,7 +552,7 @@ class StateValueNNModel(NNModel):
         )
 
 
-class PriorsNNModel(NNModel):
+class PriorsNNModel(CNNModel):
     def __init__(self, name):
         super().__init__(name)
 
@@ -583,7 +591,7 @@ class PriorsNNModel(NNModel):
         )
 
 
-class DQNNNModel(NNModel):
+class DQNNNModel(CNNModel):
     def __init__(self, name):
         super().__init__(name)
 
@@ -621,7 +629,7 @@ class DQNNNModel(NNModel):
         )
 
 
-class DQNResNetNNModel(NNModel):
+class DQNResNetNNModel(CNNModel):
     def __init__(self, name):
         super().__init__(name)
 

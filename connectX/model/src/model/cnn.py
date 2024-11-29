@@ -25,9 +25,10 @@ from pathlib import Path
 import logging
 import os
 
-
-# MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
-MODEL_FOLDER = Path("resources/models/")
+# if os.environ.get("KAGGLE_KERNEL_RUN_TYPE", "") == "":
+# MODEL_FOLDER = Path("resources/models/")
+# else:
+MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
 
 
 MAX_EPOCHS = 10
@@ -46,7 +47,7 @@ HIDDEN_CNN_LAYERS = [
 
 class CNNModel:
     def __init__(self, name, reg_const=REG_CONST, learning_rate=LEARNING_RATE):
-        self._name = name + ".h5"
+        self._name = name + ".keras"
         self._model = None
         self._history = None
         self._logger = logging.getLogger("agent")
@@ -109,7 +110,7 @@ class CNNModel:
         np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
         return np_boards_channels
 
-    @function
+    @function(reduce_retracing=False)
     def _predict(self, boards):
         return self._model(boards)
 
@@ -145,7 +146,7 @@ class CNNModel:
         return predictions
 
     def save(self):
-        self._model.save(MODEL_FOLDER / self._name, save_format="h5")
+        self._model.save(MODEL_FOLDER / self._name)
 
     def load(self, name=None, lr=5e-5):
         if name is None:
@@ -306,7 +307,7 @@ class Residual_CNN_Old(CNNModel):
         self._model.compile(
             loss={
                 "value_head": "mean_squared_error",
-                "policy_head": "kullback_leibler_divergence",
+                "policy_head": "kl_divergence",
             },
             optimizer=SGD(learning_rate=self.learning_rate, momentum=MOMENTUM),
             loss_weights={"value_head": 0.5, "policy_head": 0.5},
@@ -504,7 +505,7 @@ class Residual_CNN(CNNModel):
         self._model.compile(
             loss={
                 "value_head": "mean_squared_error",
-                "policy_head": "kullback_leibler_divergence",
+                "policy_head": "kl_divergence",
             },
             # optimizer=SGD(learning_rate=self.learning_rate, momentum=MOMENTUM),
             optimizer=Adam(learning_rate=lr),
@@ -585,7 +586,7 @@ class PriorsNNModel(CNNModel):
             ]
         )
         self._model.compile(
-            loss="kullback_leibler_divergence",
+            loss="kl_divergence",
             optimizer=Adam(learning_rate=lr),
             metrics=["mean_squared_error"],
         )

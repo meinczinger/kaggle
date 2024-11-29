@@ -53,9 +53,9 @@ class ParallelPlayer:
                 executor.submit(self.self_play, iter, lock, i)
                 time.sleep(5)
 
-        print(gc.get_count())
+        print("gc before collect", gc.get_count())
         gc.collect()
-        print(gc.get_count())
+        print("gc after collect", gc.get_count())
 
     def custom_hook(self, args):
         print(f"Thread failed: {args.exc_value}")
@@ -66,12 +66,12 @@ class ParallelPlayer:
         state_values = pd.read_csv(
             self._games_folder / games_file, delimiter=",", header=None
         )
-        print("Size of", games_file, "is", len(state_values))
+        self.logger.info("Size of", games_file, "is", len(state_values))
         state_values = state_values[-self._history_size :]
         state_values.to_csv(self._games_folder / games_file, index=False, header=False)
 
     def self_play(self, iter, lock, thread_nr):
-        print("Starting self play", "iter=", iter)
+        # self.logger.info("Starting self play", "iter=", iter)
         sim = Simulator(
             config,
             self._games_folder,
@@ -90,7 +90,7 @@ class ParallelPlayer:
             ),
         )
         for i in range(iter):
-            print("Thread:", thread_nr, "Play:", i)
+            self.logger.info(f"Thread: {thread_nr} Play: {i}")
             sim.self_play(
                 None,
                 GameManager(self._games_folder),

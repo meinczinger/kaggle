@@ -11,6 +11,8 @@ NUMBER_OF_MOVES_WITH_TEMPRETURE_ONE = 16
 
 
 class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
+    _nn_mcts = None
+
     def __init__(
         self,
         configuration,
@@ -193,3 +195,11 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
             self._tree.update_visited(traverse_node, factor * value)
             factor *= -1.0
             traverse_node = self._tree.parent(traverse_node)
+
+    @staticmethod
+    def get_instance(configuration):
+        if NeuralNetworkMonteCarloTreeSearch._nn_mcts is None:
+            NeuralNetworkMonteCarloTreeSearch._nn_mcts = (
+                NeuralNetworkMonteCarloTreeSearch(configuration)
+            )
+        return NeuralNetworkMonteCarloTreeSearch._nn_mcts

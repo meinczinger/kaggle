@@ -5,8 +5,8 @@ pyvenv.cfg
 **/__pycache__/*
 submission.tar.gz
 *.log
-
-
+submission/*
+submission*tar.gz
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,5 +1,5 @@
 from keras.api.optimizers import SGD, Adam
-from tensorflow import function
+from tensorflow import function, convert_to_tensor, int8, cast
 
 from keras import Sequential, Model
 from keras.api.layers import (
@@ -25,10 +25,10 @@ from pathlib import Path
 import logging
 import os
 
-# if os.environ.get("KAGGLE_KERNEL_RUN_TYPE", "") == "":
-# MODEL_FOLDER = Path("resources/models/")
-# else:
-MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
+if os.environ.get("TRAIN_ENV") == "local":
+    MODEL_FOLDER = Path("resources/models/")
+else:
+    MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
 
 
 MAX_EPOCHS = 10
@@ -108,9 +108,9 @@ class CNNModel:
         )
         np_boards_channels[:, :, :, 0] = np.where(np_boards == 1, 1, 0)
         np_boards_channels[:, :, :, 1] = np.where(np_boards == 2, 1, 0)
-        return np_boards_channels
+        return cast(np_boards_channels, dtype=int8)
 
-    @function(reduce_retracing=False)
+    @function
     def _predict(self, boards):
         return self._model(boards)
 

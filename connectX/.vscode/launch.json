@@ -10,7 +10,10 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "env": {
+                "TRAIN_ENV": "local"
+            }
         },
         {
             "name": "Python: Current File",
@@ -18,7 +21,10 @@
             "request": "test",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+                        "env": {
+                "TRAIN_ENV": "local"
+            }
         }
     ]
 }

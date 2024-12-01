@@ -66,12 +66,12 @@ class ParallelPlayer:
         state_values = pd.read_csv(
             self._games_folder / games_file, delimiter=",", header=None
         )
-        self.logger.info("Size of", games_file, "is", len(state_values))
+        self.logger.info(f"Size of {games_file} is  {len(state_values)}")
         state_values = state_values[-self._history_size :]
         state_values.to_csv(self._games_folder / games_file, index=False, header=False)
 
     def self_play(self, iter, lock, thread_nr):
-        # self.logger.info("Starting self play", "iter=", iter)
+        self.logger.info(f"Starting self play, iter= {iter}")
         sim = Simulator(
             config,
             self._games_folder,

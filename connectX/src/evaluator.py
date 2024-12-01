@@ -384,7 +384,7 @@ class Evaluator:
                 ratio_2,
             )
 
-        self._logger.info(
+        self._evaluation_result_logger.info(
             "The final reward ratio against baseline is "
             + str(ratio_1)
             + ", "

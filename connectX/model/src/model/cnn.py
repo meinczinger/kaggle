@@ -25,7 +25,7 @@ from pathlib import Path
 import logging
 import os
 
-if os.environ.get("TRAIN_ENV") == "local":
+if os.getenv("TRAIN_ENV") == "local":
     MODEL_FOLDER = Path("resources/models/")
 else:
     MODEL_FOLDER = Path("/kaggle_simulations/agent/resources/models/")
@@ -443,56 +443,30 @@ class Residual_CNN(CNNModel):
     def create_model(self, lr=1e-3):
 
         main_input = Input(shape=self.input_dim, name="main_input")
-
-        # common = Sequential(
-        #         [
-        #             Conv2D(256, 4, padding="same", input_shape=(6, 7, 2)),
-        #             BatchNormalization(axis=3),
-        #             Activation("relu"),
-        #             MaxPooling2D(),
-        #             Dropout(0.3),
-        #             Conv2D(128, 3, padding="same"),
-        #             Conv2D(128, 3, padding="same"),
-        #             BatchNormalization(axis=3),
-        #             Activation("relu"),
-        #             MaxPooling2D(),
-        #             Dropout(0.3),
-        #             Conv2D(128, 3, padding="same"),
-        #             Conv2D(128, 3, padding="same"),
-        #             Conv2D(128, 3, padding="same"),
-        #             BatchNormalization(axis=3),
-        #             Activation("relu"),
-        #             Dropout(0.3),
-        #             Flatten(),
-        #             Dense(256, activation="relu"),
-        #             BatchNormalization(),
-        #             Dense(256, activation="relu"),
-        #             BatchNormalization(),
-        #         ])
-
+        # common = Input(main_input)
         common = Conv2D(256, 5, padding="same", input_shape=(6, 7, 2))(main_input)
         common = BatchNormalization(axis=3)(common)
         common = Activation("relu")(common)
         common = MaxPooling2D()(common)
-        common = Dropout(0.3)(common)
+        common = Dropout(0.1)(common)
         common = Conv2D(256, 4, padding="same")(common)
         common = Conv2D(256, 4, padding="same")(common)
         common = BatchNormalization(axis=3)(common)
         common = Activation("relu")(common)
         common = MaxPooling2D()(common)
-        common = Dropout(0.3)(common)
+        common = Dropout(0.1)(common)
         common = Conv2D(128, 3, padding="same")(common)
         common = Conv2D(128, 3, padding="same")(common)
         common = BatchNormalization(axis=3)(common)
         common = Activation("relu")(common)
         common = MaxPooling2D()(common)
-        common = Dropout(0.3)(common)
+        common = Dropout(0.1)(common)
         common = Conv2D(128, 3, padding="same")(common)
         common = Conv2D(128, 3, padding="same")(common)
         common = Conv2D(128, 3, padding="same")(common)
         common = BatchNormalization(axis=3)(common)
         common = Activation("relu")(common)
-        common = Dropout(0.3)(common)
+        common = Dropout(0.1)(common)
         common = Flatten()(common)
         common = Dense(256, activation="relu")(common)
         common = BatchNormalization()(common)

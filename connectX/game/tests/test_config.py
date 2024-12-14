@@ -6,3 +6,4 @@ class TestConfig:
     def test_struct(self):
         config = get_config()
         assert config.columns == 7
+

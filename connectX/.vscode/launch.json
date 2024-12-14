@@ -4,27 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [        
+        {"name":"Python Debugger: Current File","type":"debugpy","request":"launch","program":"${file}","console":"integratedTerminal", "justMyCode": false,"env": {
+                "TRAIN_ENV": "local"
+            }}, 
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "stopOnEntry": true,
             "env": {
                 "TRAIN_ENV": "local"
             }
         },
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "test",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-                        "env": {
-                "TRAIN_ENV": "local"
-            }
-        }
-    ]
+   ]
 }

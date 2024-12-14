@@ -176,9 +176,12 @@ class NeuralNetworkMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
                 self._tree.player(node) % 2
             ].predict([self._tree.board_list(node)])
             for child in children:
-                self._tree.set_prior(
-                    child, priors_prediction[0][self._tree.action(child)]
-                )
+                if self._tree.leaf(child):
+                    self._tree.set_prior(child, 1)
+                else:
+                    self._tree.set_prior(
+                        child, priors_prediction[0][self._tree.action(child)]
+                    )
         return 2 * value_predictions[0][0] - 1.0
         # value_predictions, priors_prediction = self._model[
         #     1 - (self._tree.player(node) % 2)

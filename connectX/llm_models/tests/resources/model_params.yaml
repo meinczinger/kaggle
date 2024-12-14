@@ -1,0 +1,7 @@
+embed_size: 384
+context: 512
+n_heads: 7
+n_layers: 7
+dropout: 0.05
+bias: True
+device: "mps"

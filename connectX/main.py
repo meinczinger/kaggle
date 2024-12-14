@@ -1,5 +1,6 @@
 import sys
 import os
+import keras
 
 cwd = "/kaggle_simulations/agent/"
 if os.path.exists(cwd):

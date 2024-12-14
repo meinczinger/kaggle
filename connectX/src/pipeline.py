@@ -30,9 +30,9 @@ TIME_REDUCTION = 1.0
 TIME_REDUCTION_EVALUATION = 1.5
 Z_STAT_SIGNIFICANT = 1.5
 DEPTH_FOR_RANDOM_GAMES_FOR_SELF_PLAY = 10
-PROB_FOR_RANDOM_MOVE_SELF_PLAY = 0.06
-DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 5
-PROB_FOR_RANDOM_MOVE_EVALUATION = 0.3
+PROB_FOR_RANDOM_MOVE_SELF_PLAY = 0.05
+DEPTH_FOR_RANDOM_GAMES_FOR_EVALUATION = 8
+PROB_FOR_RANDOM_MOVE_EVALUATION = 0.05
 NR_OF_THREADS_FOR_SELF_PLAY = 20
 BATCH_SIZE = 32
 
@@ -78,8 +78,10 @@ evaluator = Evaluator(
 # create model if not exist
 execute_task(f=optimizer.create_initial_model)
 
-execute_task(f=pplayer.parallel_self_play, iter=NR_OF_ITERATIONS)
+for _ in range(5):
 
-execute_task(f=optimizer.optimize, train=True)
+    execute_task(f=pplayer.parallel_self_play, iter=NR_OF_ITERATIONS)
 
-execute_task(f=evaluator.evaluate)
+    execute_task(f=optimizer.optimize, train=True)
+
+    execute_task(f=evaluator.evaluate)

@@ -55,6 +55,8 @@ class Simulator:
 
         last_random_move = 0
 
+        actions = []
+
         # Execute moves before we reach a terminal state
         while not bitboard.is_terminal_state():
             # print("Thread", thread_nr, "making move", ply)
@@ -67,6 +69,7 @@ class Simulator:
             else:
                 action = self.agents[0].act(obs, step, step == nr_of_random_moves)
 
+            actions.append(action + 1)
             # Make the move
             bitboard.make_action(action)
 
@@ -116,6 +119,11 @@ class Simulator:
             writer.save(
                 priors_df[priors_df[0] == 2].iloc[:, 1:],
                 "train_priors_values_p2.csv",
+                lock,
+            )
+            writer.save(
+                pd.DataFrame(actions + [(ply + 1) % 2] + [int(reward)]).T,
+                "train_actions.csv",
                 lock,
             )
 

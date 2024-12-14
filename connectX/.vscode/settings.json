@@ -1,7 +1,7 @@
 {
     "python.formatting.provider": "black",
     "python.testing.pytestArgs": [
-        "model", "game", "agent", "mcts", "logger"
+        "agent"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true

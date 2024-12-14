@@ -1,5 +1,6 @@
 #!/bin/bash
-cp -R game/src/game/* submission/game 
+cp -R game/src/game/* submission/game
+cp main.py submission 
 cp mcts/src/mcts/*.py submission/mcts
 cp model/src/model/*.py submission/model 
 cp agent/src/agent/*.py submission/agent

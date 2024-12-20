@@ -7,6 +7,8 @@ import copy
 
 
 class ClassicMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
+    _mcts = None
+
     def __init__(self, configuration):
         super().__init__(configuration)
         self._explore_factor = 2.0
@@ -104,3 +106,11 @@ class ClassicMonteCarloTreeSearch(BaseMonteCarloTreeSearch):
         except Exception as ex:
             # self._logger._logger.error(ex, exc_info=True)
             pass
+
+    @staticmethod
+    def get_instance(configuration):
+        if ClassicMonteCarloTreeSearch._mcts is None:
+            ClassicMonteCarloTreeSearch._mcts = ClassicMonteCarloTreeSearch(
+                configuration
+            )
+        return ClassicMonteCarloTreeSearch._mcts

@@ -11,7 +11,7 @@ from mcts.nn_mcts import NeuralNetworkMonteCarloTreeSearch
 from mcts.classic_mcts import ClassicMonteCarloTreeSearch
 from game.config import get_config
 
-Z_STAT_SIGNIFICANT = 1.5
+Z_STAT_SIGNIFICANT = 1.0
 
 config = get_config()
 
@@ -103,7 +103,7 @@ class Evaluator:
         best1_best2 = [
             self.create_simulator(True, True, True, True) for _ in range(parallelism)
         ]
-        candidate1_best2 = [
+        candidate1_best1 = [
             self.create_simulator(False, True, True, True) for _ in range(parallelism)
         ]
         best1_candidate2 = [
@@ -144,7 +144,7 @@ class Evaluator:
                         )
                         # Candidate vs best
                         winnercbres[j] = executor.submit(
-                            candidate1_best2[j].simulate,
+                            candidate1_best1[j].simulate,
                             random_positions[j],
                             random_positions[j].active_player(),
                         )
@@ -157,8 +157,8 @@ class Evaluator:
 
                 reward_best1_best2 = 0
                 reward_best2_best1 = 0
-                reward_candidate1_best2 = 0
-                reward_candidate2_best1 = 0
+                reward_candidate1_best1 = 0
+                reward_candidate2_best2 = 0
 
                 for j in range(parallelism):
                     winnerbb = winnerbbres[j].result()
@@ -174,34 +174,41 @@ class Evaluator:
                             reward_best2_best1 += 1.0
 
                     if winnercb == 1:
-                        reward_candidate1_best2 += 1.0
+                        reward_candidate1_best1 += 1.0
                     else:
                         if winnercb == 0:
-                            reward_candidate1_best2 += 0.5
+                            reward_candidate1_best1 += 0.5
 
                     if winnerbc == 2:
-                        reward_candidate2_best1 += 1.0
+                        reward_candidate2_best2 += 1.0
                     else:
                         if winnerbc == 0:
-                            reward_candidate2_best1 += 0.5
+                            reward_candidate2_best2 += 0.5
 
                 best1_best2_buffer.append(reward_best1_best2 / float(parallelism))
                 best2_best1_buffer.append(reward_best2_best1 / float(parallelism))
                 candidate1_best2_buffer.append(
-                    reward_candidate1_best2 / float(parallelism)
+                    reward_candidate1_best1 / float(parallelism)
                 )
                 candidate2_best1_buffer.append(
-                    reward_candidate2_best1 / float(parallelism)
+                    reward_candidate2_best2 / float(parallelism)
                 )
 
             print(
-                "Candidate1 vs best2 averages after round", it, candidate1_best2_buffer
+                "Candidate1 vs best1 averages after round", it, candidate1_best2_buffer
             )
             print("Best1 vs best2 averages after round", it, best1_best2_buffer)
             print(
-                "Candidate2 vs best1 averages after round", it, candidate2_best1_buffer
+                "Candidate2 vs best2 averages after round", it, candidate2_best1_buffer
             )
             print("Best2 vs best1 averages after round", it, best2_best1_buffer)
+
+            print(
+                f"Average c1/b1 is {sum(candidate1_best2_buffer) / len(candidate1_best2_buffer)}, {sum(best1_best2_buffer) / len(best1_best2_buffer)}"
+            )
+            print(
+                f"Average c2/b2 is {sum(candidate2_best1_buffer) / len(candidate2_best1_buffer)}, {sum(best2_best1_buffer) / len(best2_best1_buffer)}"
+            )
 
             zstat1 = self.zstat(
                 candidate1_best2_buffer, best1_best2_buffer, (r + 1) * round_length
@@ -212,9 +219,9 @@ class Evaluator:
             print(
                 "zstats after round",
                 it,
-                "candidate1/best1 against best2",
+                "candidate1 against best1",
                 round(zstat1, 2),
-                "candidate2/best2 against best1",
+                "candidate2 against best2",
                 round(zstat2, 2),
             )
 

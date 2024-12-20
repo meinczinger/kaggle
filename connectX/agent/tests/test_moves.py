@@ -2,8 +2,7 @@
 
 # load_dotenv()
 
-from game.board import BitBoard
-
+from game.board.bitboard import BitBoard
 
 from game import get_config
 

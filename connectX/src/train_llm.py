@@ -16,7 +16,7 @@ vocab_size = 8
 dtype = torch.bfloat16
 
 start_iteration = 0
-train_iters = 20
+train_iters = 21
 eval_interval = 10
 weight_decay = 0.01
 lr = 3e-4
